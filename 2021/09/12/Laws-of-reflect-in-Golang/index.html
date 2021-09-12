@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Head tag -->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="google-site-verification" content="xBT4GhYoi5qRD5tr338pgPM5OWHHIDR6mNg1a3euekI" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="thinking, learning, running">
+    <meta name="keyword"  content="">
+    <link rel="shortcut icon" href="/img/favicon.ico">
+
+    <title>
+        
+          初探Go反射三大定律 - 易浅的世界 | Eachen&#39;s World
+        
+    </title>
+
+    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/12/Laws-of-reflect-in-Golang/">
+
+    <!-- Bootstrap Core CSS -->
+    
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+
+
+    <!-- Custom CSS -->
+    
+<link rel="stylesheet" href="/css/hux-blog.min.css">
+
+
+    <!-- Pygments Highlight CSS -->
+    
+<link rel="stylesheet" href="/css/highlight.css">
+
+
+    <!-- Custom Fonts -->
+    <!-- <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css"> -->
+    <!-- Hux change font-awesome CDN to qiniu -->
+    <link href="https://cdn.staticfile.org/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+
+    <!-- Hux Delete, sad but pending in China
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/
+    css'>
+    -->
+
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- ga & ba script hoook -->
+    <script></script>
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+
+<!-- hack iOS CSS :active style -->
+<body ontouchstart="">
+
+    <!-- Navigation -->
+<nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+    <div class="container-fluid">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header page-scroll">
+            <button type="button" class="navbar-toggle">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/">易浅的世界</a>
+        </div>
+
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <!-- Known Issue, found by Hux:
+            <nav>'s height woule be hold on by its content.
+            so, when navbar scale out, the <nav> will cover tags.
+            also mask any touch event of tags, unfortunately.
+        -->
+        <div id="huxblog_navbar">
+            <div class="navbar-collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="/">Home</a>
+                    </li>
+
+                    
+
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/about/">About</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/tags/">Tags</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/archives/">Archives</a>
+                        </li>
+                        
+                    
+                    
+                </ul>
+            </div>
+        </div>
+        <!-- /.navbar-collapse -->
+    </div>
+    <!-- /.container -->
+</nav>
+<script>
+    // Drop Bootstarp low-performance Navbar
+    // Use customize navbar with high-quality material design animation
+    // in high-perf jank-free CSS3 implementation
+    var $body   = document.body;
+    var $toggle = document.querySelector('.navbar-toggle');
+    var $navbar = document.querySelector('#huxblog_navbar');
+    var $collapse = document.querySelector('.navbar-collapse');
+
+    $toggle.addEventListener('click', handleMagic)
+    function handleMagic(e){
+        if ($navbar.className.indexOf('in') > 0) {
+        // CLOSE
+            $navbar.className = " ";
+            // wait until animation end.
+            setTimeout(function(){
+                // prevent frequently toggle
+                if($navbar.className.indexOf('in') < 0) {
+                    $collapse.style.height = "0px"
+                }
+            },400)
+        }else{
+        // OPEN
+            $collapse.style.height = "auto"
+            $navbar.className += " in";
+        }
+    }
+</script>
+
+
+    <!-- Main Content -->
+    
+<!-- Image to hack wechat -->
+<!-- <img src="https://eachenkuang.github.io/img/icon_wechat.png" width="0" height="0"> -->
+<!-- <img src="{{ site.baseurl }}/{% if page.header-img %}{{ page.header-img }}{% else %}{{ site.header-img }}{% endif %}" width="0" height="0"> -->
+
+<!-- Post Header -->
+<style type="text/css">
+    header.intro-header{
+        background-image: url('/img/home-bg.jpg')
+    }
+</style>
+<header class="intro-header" >
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <div class="post-heading">
+                    <div class="tags">
+                        
+                          <a class="tag" href="/tags/#Go" title="Go">Go</a>
+                        
+                    </div>
+                    <h1>初探Go反射三大定律</h1>
+                    <h2 class="subheading"></h2>
+                    <span class="meta">
+                        Posted by Eachen Kuang on
+                        2021-09-12
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Post Content -->
+<article>
+    <div class="container">
+        <div class="row">
+
+    <!-- Post Container -->
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                post-container">
+
+                <h1 id="初探Go反射三大定律"><a href="#初探Go反射三大定律" class="headerlink" title="初探Go反射三大定律"></a>初探Go反射三大定律</h1><blockquote>
+<p>最近在研究Go语言的源码，看到反射部分，结合<code>The Go Blog</code>系列的《<a target="_blank" rel="noopener" href="https://blog.golang.org/laws-of-reflection">The Laws of Reflection</a>》，以及Go 1.15 中 <code>src/reflect</code>部分源码，记录下对于Go 反射的一些见解。</p>
+</blockquote>
+<h2 id="〇、前情提要"><a href="#〇、前情提要" class="headerlink" title="〇、前情提要"></a>〇、前情提要</h2><p>Go的反射基础是<code>接口</code>和<code>类型系统</code>。学习之前，最好先了解Go接口的实现，另外，反射的API也很多，了解其核心部分即可，一些其他API可以在通过源码分析来了解。笔者在本文中只是结合源码分析初探Go反射的三大定律。</p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/%E5%8F%8D%E5%B0%84%E5%9B%BE%E8%A7%A3(%E4%B8%80).png" alt="反射图解(一)"></p>
+<p>在反射的世界里，我们拥有了获取一个对象的类型，属性及方法的能力。</p>
+<h2 id="一、反射的基本概念"><a href="#一、反射的基本概念" class="headerlink" title="一、反射的基本概念"></a>一、反射的基本概念</h2><p><strong>什么是反射（reflect）</strong></p>
+<p>维基百科如<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Reflective_programming">是说明</a>：</p>
+<blockquote>
+<p>In computer science, reflective programming or reflection is the ability of a process to examine, introspect, and modify its own structure and behavior.</p>
+<p>在计算机科学中，反射式编程或反射是一个过程检查、内省和修改自身结构和行为的能力</p>
+<p>另外还配上了Go语言的一些示例代码</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="string">&quot;reflect&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Without reflection</span></span><br><span class="line">f := Foo&#123;&#125;</span><br><span class="line">f.Hello()</span><br><span class="line"></span><br><span class="line"><span class="comment">// With reflection</span></span><br><span class="line">fT := reflect.TypeOf(Foo&#123;&#125;)</span><br><span class="line">fV := reflect.New(fT)</span><br><span class="line"></span><br><span class="line">m := fV.MethodByName(<span class="string">&quot;Hello&quot;</span>)</span><br><span class="line"><span class="keyword">if</span> m.IsValid() &#123;</span><br><span class="line">    m.Call(<span class="literal">nil</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p>今天我们重点讲讲Go语言的三大反射定律</p>
+<p><strong>为什么要使用反射？</strong></p>
+<ul>
+<li><p>Go 不支持泛型，通过反射可以间接实现泛型的需求</p>
+</li>
+<li><p>借助反射可以极大简化设计，不需要对每一种场景做硬编码处理</p>
+</li>
+<li><p>反射提供了一种程序了解自己和改变自己的能力，这为一些测试工具的开发提供了有力的支持。</p>
+</li>
+</ul>
+<h2 id="二、反射的两种基本数据结构"><a href="#二、反射的两种基本数据结构" class="headerlink" title="二、反射的两种基本数据结构"></a>二、反射的两种基本数据结构</h2><p>Go的反射巧妙地借助了实例到接口的转换所使用的数据结构，首先将实例传给内部的空接口，实际上是将实例类型转换为接口可以表述的数据结构<code>emptyInterface</code>，反射基于这个转换后的数据结构来访问和操作实例的值和类型。实例传递给interface{} 类型，编译器会进行一个内部的转换，自动创建相关类型数据结构。</p>
+<h3 id="2-1-reflect-Type"><a href="#2-1-reflect-Type" class="headerlink" title="2.1 reflect.Type"></a>2.1 <code>reflect.Type</code></h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Type 是 Go 类型的表示</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// 并非所有方法都适用于所有类型。 每种方法的文档中都注明了限制（如果有）。</span></span><br><span class="line"><span class="comment">// 在调用特定于种类的方法之前，使用 Kind 方法找出类型的种类。 </span></span><br><span class="line"><span class="comment">// 调用不适合该类型的方法会导致运行时panic。</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// 类型值是可比较的，例如使用 == 运算符，因此它们可以用作映射键。</span></span><br><span class="line"><span class="comment">// 如果两个 Type 值表示相同的类型，则它们相等。</span></span><br><span class="line"><span class="keyword">type</span> Type <span class="keyword">interface</span> &#123;</span><br><span class="line">    Align() <span class="keyword">int</span></span><br><span class="line">    FieldAlign() <span class="keyword">int</span></span><br><span class="line">    Method(<span class="keyword">int</span>) Method </span><br><span class="line">    MethodByName(<span class="keyword">string</span>) (Method, <span class="keyword">bool</span>)</span><br><span class="line">    NumMethod() <span class="keyword">int</span></span><br><span class="line">    Name() <span class="keyword">string</span></span><br><span class="line">    PkgPath() <span class="keyword">string</span></span><br><span class="line">    Size() <span class="keyword">uintptr</span> </span><br><span class="line">    String() <span class="keyword">string</span>  </span><br><span class="line">    Kind() Kind</span><br><span class="line">    Implements(u Type) <span class="keyword">bool</span></span><br><span class="line">    AssignableTo(u Type) <span class="keyword">bool</span></span><br><span class="line">    ConvertibleTo(u Type) <span class="keyword">bool</span> </span><br><span class="line">    Comparable() <span class="keyword">bool</span></span><br><span class="line">    Bits() <span class="keyword">int</span></span><br><span class="line">    ChanDir() ChanDir</span><br><span class="line">    IsVariadic() <span class="keyword">bool</span></span><br><span class="line">    Elem() Type</span><br><span class="line">    Field(i <span class="keyword">int</span>) StructField</span><br><span class="line">    FieldByIndex(index []<span class="keyword">int</span>) StructField</span><br><span class="line">    FieldByName(name <span class="keyword">string</span>) (StructField, <span class="keyword">bool</span>)</span><br><span class="line">    FieldByNameFunc(match <span class="function"><span class="keyword">func</span><span class="params">(<span class="keyword">string</span>)</span> <span class="title">bool</span>) <span class="params">(StructField, <span class="keyword">bool</span>)</span></span></span><br><span class="line">    In(i <span class="keyword">int</span>) Type</span><br><span class="line">    Key() Type</span><br><span class="line">    Len() <span class="keyword">int</span></span><br><span class="line">    NumField() <span class="keyword">int</span></span><br><span class="line">    NumIn() <span class="keyword">int</span></span><br><span class="line">    NumOut() <span class="keyword">int</span>    </span><br><span class="line">    Out(i <span class="keyword">int</span>) Type</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>源码见<code>src/reflect/type.go</code></p>
+<p>可以看到，<code>Type</code>是一个接口，它里面定义了28个方法</p>
+<p>为什么反射接口返回的是一个Type接口类型，而不是直接返回具体的类型结构呢</p>
+<ul>
+<li><p>一是因为类型信息是一个只读的信息，不可能动态地修改类型的相关信息，那太不安全了；</p>
+</li>
+<li><p>二是因为不同的类型，类型定义也不一样，使用接口这一抽象数据结构能够进行统一的抽象。</p>
+</li>
+</ul>
+<h3 id="2-2-reflect-Value"><a href="#2-2-reflect-Value" class="headerlink" title="2.2 reflect.Value"></a>2.2 <code>reflect.Value</code></h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Value 是 Go 值的反射接口。</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// 并非所有方法都适用于所有类型的值。 每种方法的文档中都注明了限制（如果有）。 在调用种类特定的方法之前，使用 Kind 方法找出值的种类。 调用不适合该类型的方法会导致运行时panic。(这里与Type是一致的)</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// 零值表示no value。</span></span><br><span class="line"><span class="comment">// 它的 IsValid 方法返回 false，它的 Kind 方法返回 Invalid，它的 String 方法返回“&lt;invalid Value&gt;”，所有其他方法都会 panic。</span></span><br><span class="line"><span class="comment">// 大多数函数和方法从不返回无效值。如果有，其文档明确说明了条件。</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// 一个值可以被多个 goroutine 同时使用，前提是底层的 Go 值可以同时用于等效的直接操作。</span></span><br><span class="line"><span class="comment">// 要比较两个值，请比较接口方法的结果。</span></span><br><span class="line"><span class="comment">// 在两个值上使用 == 不会比较它们代表的基础值。</span></span><br><span class="line"><span class="keyword">type</span> Value <span class="keyword">struct</span> &#123;</span><br><span class="line">   typ *rtype</span><br><span class="line">   ptr unsafe.Pointer</span><br><span class="line">   flag</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>源码见<code>src/reflect/value.go</code></p>
+<p>可以发现，<code>Value</code>是一个结构体，它包含三个字段</p>
+<ul>
+<li><code>typ</code> 值的类型指针</li>
+<li><code>ptr</code> 指向值的指针</li>
+<li><code>flag</code> 标记字段</li>
+</ul>
+<p>另外，Value 还有68个方法，这里先就不赘述了，包括61个 public 方法和7个 private 方法</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line">Addr</span><br><span class="line">Bool</span><br><span class="line">Bytes</span><br><span class="line">CanAddr</span><br><span class="line">CanSet</span><br><span class="line">Call</span><br><span class="line">CallSlice</span><br><span class="line">Cap</span><br><span class="line">Close</span><br><span class="line">Complex</span><br><span class="line">Elem</span><br><span class="line">Field</span><br><span class="line">FieldByIndex</span><br><span class="line">FieldByName</span><br><span class="line">FieldByNameFunc</span><br><span class="line">Float</span><br><span class="line">Index</span><br><span class="line">Int</span><br><span class="line">CanInterface</span><br><span class="line">Interface</span><br><span class="line">InterfaceData</span><br><span class="line">IsNil</span><br><span class="line">IsValid</span><br><span class="line">IsZero</span><br><span class="line">Kind</span><br><span class="line">Len</span><br><span class="line">MapIndex</span><br><span class="line">MapKeys</span><br><span class="line">MapRange</span><br><span class="line">Method</span><br><span class="line">NumMethod</span><br><span class="line">MethodByName</span><br><span class="line">NumField</span><br><span class="line">OverflowComplex</span><br><span class="line">OverflowFloat</span><br><span class="line">OverflowInt</span><br><span class="line">OverflowUint</span><br><span class="line">Pointer</span><br><span class="line">Recv</span><br><span class="line">Send</span><br><span class="line">Set</span><br><span class="line">SetBool</span><br><span class="line">SetBytes</span><br><span class="line">SetComplex</span><br><span class="line">SetFloat</span><br><span class="line">SetInt</span><br><span class="line">SetLen</span><br><span class="line">SetCap</span><br><span class="line">SetMapIndex</span><br><span class="line">SetUint</span><br><span class="line">SetPointer</span><br><span class="line">SetString</span><br><span class="line">Slice</span><br><span class="line">Slice3</span><br><span class="line">String</span><br><span class="line">TryRecv</span><br><span class="line">TrySend</span><br><span class="line">Type</span><br><span class="line">Uint</span><br><span class="line">UnsafeAddr</span><br><span class="line">Convert</span><br><span class="line">pointer</span><br><span class="line">runes</span><br><span class="line">call</span><br><span class="line">recv</span><br><span class="line">send</span><br><span class="line">setRunes</span><br><span class="line">assignTo</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="三、反射三定律"><a href="#三、反射三定律" class="headerlink" title="三、反射三定律"></a>三、反射三定律</h2><p>《<a target="_blank" rel="noopener" href="https://blog.golang.org/laws-of-reflection">The Laws of Reflection</a>》原文提到反射的三个定律</p>
+<blockquote>
+<ol>
+<li><p>Reflection goes from interface value to reflection object.</p>
+</li>
+<li><p>Reflection goes from reflection object to interface value.</p>
+</li>
+<li><p>To modify a reflection object, the value must be settable.</p>
+</li>
+</ol>
+</blockquote>
+<p>翻译过来就是</p>
+<ol>
+<li>反射可以从接口值得到反射对象</li>
+<li>反射可以从反射对象对到接口值</li>
+<li>若要修改一个反射对象，则其值必须可修改</li>
+</ol>
+<p>是不是感觉听起来很绕，我们一一解读。</p>
+<h3 id="3-1-第一定律"><a href="#3-1-第一定律" class="headerlink" title="3.1 第一定律"></a>3.1 第一定律</h3><blockquote>
+<p>反射可以从接口值得到反射对象</p>
+</blockquote>
+<p>从接口对象获取对应的反射对象可以使用<code>reflect.TypeOf()</code>与<code>reflect.ValueOf()</code>分别获取反射的类型对象与反射的值对象。也就是第二节中的 <code>reflect.Type</code>与<code>reflect.Value</code></p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/%E5%8F%8D%E5%B0%84%E5%9B%BE%E8%A7%A3(%E4%BA%8C).png" alt="反射图解(二)"></p>
+<p>我们看一个例子：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">&quot;fmt&quot;</span></span><br><span class="line">	<span class="string">&quot;reflect&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> S <span class="keyword">struct</span> &#123;</span><br><span class="line">	a <span class="keyword">int</span></span><br><span class="line">	b <span class="keyword">float64</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	<span class="keyword">var</span> x <span class="keyword">float64</span> = <span class="number">3.4</span></span><br><span class="line">	<span class="keyword">var</span> y <span class="keyword">int</span> = <span class="number">100</span></span><br><span class="line">	<span class="keyword">var</span> s = S&#123;</span><br><span class="line">		a: <span class="number">1</span>,</span><br><span class="line">		b: <span class="number">90.9</span>,</span><br><span class="line">	&#125;</span><br><span class="line">	fmt.Println(<span class="string">&quot;type:&quot;</span>, reflect.TypeOf(x))</span><br><span class="line">	fmt.Println(<span class="string">&quot;value:&quot;</span>, reflect.ValueOf(x).String())</span><br><span class="line">	fmt.Println(<span class="string">&quot;type:&quot;</span>, reflect.TypeOf(y))</span><br><span class="line">	fmt.Println(<span class="string">&quot;value:&quot;</span>, reflect.ValueOf(y).String())</span><br><span class="line">	fmt.Println(<span class="string">&quot;type:&quot;</span>, reflect.TypeOf(s))</span><br><span class="line">	fmt.Println(<span class="string">&quot;value:&quot;</span>, reflect.ValueOf(s).String())</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 结果</span></span><br><span class="line"><span class="keyword">type</span>: <span class="keyword">float64</span></span><br><span class="line">value: &lt;<span class="keyword">float64</span> Value&gt;</span><br><span class="line"><span class="keyword">type</span>: <span class="keyword">int</span></span><br><span class="line">value: &lt;<span class="keyword">int</span> Value&gt;</span><br><span class="line"><span class="keyword">type</span>: main.S</span><br><span class="line">value: &lt;main.S Value&gt;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>TypeOf()</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TypeOf returns the reflection Type that represents the dynamic type of i.</span></span><br><span class="line"><span class="comment">// If i is a nil interface value, TypeOf returns nil.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">TypeOf</span><span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span> <span class="title">Type</span></span> &#123;</span><br><span class="line">   eface := *(*emptyInterface)(unsafe.Pointer(&amp;i))</span><br><span class="line">   <span class="keyword">return</span> toType(eface.typ)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>ValueOf</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ValueOf returns a new Value initialized to the concrete value</span></span><br><span class="line"><span class="comment">// stored in the interface i. ValueOf(nil) returns the zero Value.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">ValueOf</span><span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span> <span class="title">Value</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> i == <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> Value&#123;&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// <span class="doctag">TODO:</span> Maybe allow contents of a Value to live on the stack.</span></span><br><span class="line">	<span class="comment">// For now we make the contents always escape to the heap. It</span></span><br><span class="line">	<span class="comment">// makes life easier in a few places (see chanrecv/mapassign</span></span><br><span class="line">	<span class="comment">// comment below).</span></span><br><span class="line">	escapes(i)</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> unpackEface(i)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到两个函数都是传递的一个空接口类型的值，参数为空接口时，可以接受任何类型。所以这里传入的类型可以任何类型的值。关于空接口的知识点不在本文中阐述。</p>
+<h3 id="3-2-第二定律"><a href="#3-2-第二定律" class="headerlink" title="3.2 第二定律"></a>3.2 第二定律</h3><blockquote>
+<p>反射可以从反射对象对到接口值</p>
+</blockquote>
+<p>刚好和第一定律相反。</p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/%E5%8F%8D%E5%B0%84%E5%9B%BE%E8%A7%A3(%E4%B8%89).png" alt="反射图解(三)"></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Interface returns v&#x27;s current value as an interface&#123;&#125;.</span></span><br><span class="line"><span class="comment">// It is equivalent to:</span></span><br><span class="line"><span class="comment">//	var i interface&#123;&#125; = (v&#x27;s underlying value)</span></span><br><span class="line"><span class="comment">// It panics if the Value was obtained by accessing</span></span><br><span class="line"><span class="comment">// unexported struct fields.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Interface</span><span class="params">()</span> <span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> valueInterface(v, <span class="literal">true</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Value 有方法 Interface() 支持从 reflect.Value 类型 转为 接口变量。</p>
+<p>另外，还提供了丰富的方法来实现从 Value到 接口对象实例的转换。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Bool</span><span class="params">()</span> <span class="title">bool</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Float</span><span class="params">()</span> <span class="title">float64</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Int</span><span class="params">()</span> <span class="title">int64</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Uint</span><span class="params">()</span> <span class="title">uint64</span></span></span><br></pre></td></tr></table></figure>
+
+<p>注意：Type是不支持逆向的，因为里面只包含类型信息，所以无法逆向转化。</p>
+<p>我们看一个例子：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">&quot;fmt&quot;</span></span><br><span class="line">	<span class="string">&quot;reflect&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> SS <span class="keyword">struct</span> &#123;</span><br><span class="line">	a <span class="keyword">int</span></span><br><span class="line">	b <span class="keyword">float64</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	<span class="keyword">var</span> x <span class="keyword">float64</span> = <span class="number">3.4</span></span><br><span class="line">	<span class="keyword">var</span> y <span class="keyword">int</span> = <span class="number">100</span></span><br><span class="line">	<span class="keyword">var</span> s = SS&#123;</span><br><span class="line">		a: <span class="number">1</span>,</span><br><span class="line">		b: <span class="number">90.9</span>,</span><br><span class="line">	&#125;</span><br><span class="line">	v1 := reflect.ValueOf(x)</span><br><span class="line">	v2 := reflect.ValueOf(y)</span><br><span class="line">	v3 := reflect.ValueOf(s)</span><br><span class="line"></span><br><span class="line">	i1 := v1.Interface()</span><br><span class="line">	i2 := v2.Interface()</span><br><span class="line">	i3 := v3.Interface()</span><br><span class="line">	fmt.Printf(<span class="string">&quot;type: %T, value: %v\n&quot;</span>, i1, i1)</span><br><span class="line">	fmt.Printf(<span class="string">&quot;type: %T, value: %v\n&quot;</span>, i2, i2)</span><br><span class="line">	fmt.Printf(<span class="string">&quot;type: %T, value: %v\n&quot;</span>, i3, i3)</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 结果</span></span><br><span class="line"><span class="keyword">type</span>: <span class="keyword">float64</span>, value: <span class="number">3.4</span></span><br><span class="line"><span class="keyword">type</span>: <span class="keyword">int</span>, value: <span class="number">100</span></span><br><span class="line"><span class="keyword">type</span>: main.SS, value: &#123;<span class="number">1</span> <span class="number">90.9</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果想要获取最初的类型，可以时候用类型断言进行转换。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">i3 := v3.Interface().(SS)</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-第三定律"><a href="#3-3-第三定律" class="headerlink" title="3.3 第三定律"></a>3.3 第三定律</h3><blockquote>
+<p>若要修改一个反射对象，则其值必须可修改</p>
+</blockquote>
+<p>这里提到一个可修改的概念，也就是<code>settable</code></p>
+<p>首先，我们应该了解，在Go中所有的传递都是值传递。值变量传递拷贝的值，指针变量传递时的指针地址的拷贝。</p>
+<p>Value 值在什么情况下是可以修改？我们知道接口对象传递给接口的是一个完全的值拷贝，如果调用反射方法<code>reflect.ValueOf()</code> 传进去的是一个值类型变量，则获得的Value实际上是原对象的一个副本，这个Value是无法被修改的。如果传进去的是一个指针，那么Value是可以修改的。</p>
+<p>Value 值的修改涉及如下两个方法：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// CanSet reports whether the value of v can be changed.</span></span><br><span class="line"><span class="comment">// A Value can be changed only if it is addressable and was not</span></span><br><span class="line"><span class="comment">// obtained by the use of unexported struct fields.</span></span><br><span class="line"><span class="comment">// If CanSet returns false, calling Set or any type-specific</span></span><br><span class="line"><span class="comment">// setter (e.g., SetBool, SetInt) will panic.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">CanSet</span><span class="params">()</span> <span class="title">bool</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> v.flag&amp;(flagAddr|flagRO) == flagAddr</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Set assigns x to the value v.</span></span><br><span class="line"><span class="comment">// It panics if CanSet returns false.</span></span><br><span class="line"><span class="comment">// As in Go, x&#x27;s value must be assignable to v&#x27;s type.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Set</span><span class="params">(x Value)</span></span> &#123;</span><br><span class="line">	v.mustBeAssignable()</span><br><span class="line">	x.mustBeExported() <span class="comment">// do not let unexported x leak</span></span><br><span class="line">	<span class="keyword">var</span> target unsafe.Pointer</span><br><span class="line">	<span class="keyword">if</span> v.kind() == Interface &#123;</span><br><span class="line">		target = v.ptr</span><br><span class="line">	&#125;</span><br><span class="line">	x = x.assignTo(<span class="string">&quot;reflect.Set&quot;</span>, v.typ, target)</span><br><span class="line">	<span class="keyword">if</span> x.flag&amp;flagIndir != <span class="number">0</span> &#123;</span><br><span class="line">		typedmemmove(v.typ, v.ptr, x.ptr)</span><br><span class="line">	&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">		*(*unsafe.Pointer)(v.ptr) = x.ptr</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>CanSet() 可以确定一个 Value 是否可以修改</p>
+<p>Set() 方法用于修改 Value，另外还有其他不同类型的Set方法</p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/image-20210726172446743.png" alt="image-20210726172446743"></p>
+<p>我们看一下例子：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">&quot;fmt&quot;</span></span><br><span class="line">	<span class="string">&quot;reflect&quot;</span></span><br><span class="line">)</span><br><span class="line"><span class="keyword">type</span> User1 <span class="keyword">struct</span> &#123;</span><br><span class="line">	ID <span class="keyword">int</span></span><br><span class="line">	Name <span class="keyword">string</span></span><br><span class="line">	Age <span class="keyword">int</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	u := User1&#123;</span><br><span class="line">		ID:   <span class="number">1</span>,</span><br><span class="line">		Name: <span class="string">&quot;eachen&quot;</span>,</span><br><span class="line">		Age:  <span class="number">26</span>,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	va := reflect.ValueOf(u)</span><br><span class="line">	vb := reflect.ValueOf(&amp;u)</span><br><span class="line">	<span class="comment">// 值类型是不可修改的</span></span><br><span class="line">	fmt.Println(va.CanSet(), va.FieldByName(<span class="string">&quot;Name&quot;</span>).CanSet())</span><br><span class="line">	<span class="comment">// 指针类型是可修改的</span></span><br><span class="line">	fmt.Println(vb.CanSet(), vb.Elem().FieldByName(<span class="string">&quot;Name&quot;</span>).CanSet())</span><br><span class="line"></span><br><span class="line">	fmt.Printf(<span class="string">&quot;%v\n\n&quot;</span>, vb)</span><br><span class="line">	name := <span class="string">&quot;kuang&quot;</span></span><br><span class="line">	vc:= reflect.ValueOf(name)</span><br><span class="line"></span><br><span class="line">	vb.Elem().FieldByName(<span class="string">&quot;Name&quot;</span>).Set(vc)</span><br><span class="line">	fmt.Printf(<span class="string">&quot;%v\n\n&quot;</span>, vb)</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 结果</span></span><br><span class="line"><span class="literal">false</span> <span class="literal">false</span></span><br><span class="line"><span class="literal">false</span> <span class="literal">true</span></span><br><span class="line">&amp;&#123;<span class="number">1</span> eachen <span class="number">26</span>&#125;</span><br><span class="line"></span><br><span class="line">&amp;&#123;<span class="number">1</span> kuang <span class="number">26</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、reflect-转化常用API"><a href="#四、reflect-转化常用API" class="headerlink" title="四、reflect 转化常用API"></a>四、reflect 转化常用API</h2><p>到此，我们已经了解了反射的三大定律。我们来总结下</p>
+<p>下图是接口对象、Type、Value之间的转化关系以及使用到的API：</p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/%E5%8F%8D%E5%B0%84%E5%9B%BE%E8%A7%A3(%E5%9B%9B).png" alt="反射图解(四)"></p>
+<p><strong>图中提到的一些 API</strong>：</p>
+<ol>
+<li><p>从实例到<code>Value</code></p>
+<p>通过实例获取 Value 对象，直接使用 reflect.ValueOf()</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">ValueOf</span><span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span> <span class="title">Value</span></span></span><br></pre></td></tr></table></figure></li>
+<li><p>从实例到<code>Type</code></p>
+<p>通过实例获取反射对象的Type，直接使用 reflect.TypeOf()</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">TypeOf</span><span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span> <span class="title">Type</span></span></span><br></pre></td></tr></table></figure></li>
+<li><p>从<code>Type</code> 到 <code>Value</code></p>
+<p><code>Type</code> 中只有类型信息，所以直接从一个Type接口变量里面是无法获取实例的<code>Value</code>的，但是可以通过该<code>Type</code>构建一个新的实例的Value。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// New 返回的是一个 Value，该Value 的type 为 PtrTo(typ)，即 Value 的Type是指定 typ 的指针类型</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">New</span><span class="params">(typ <span class="keyword">type</span>)</span> <span class="title">Value</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Zero 返回的是是一个typ 类型的零值，注意返回的Value不能寻址，值不可改变</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Zero</span><span class="params">(typ <span class="keyword">type</span>)</span> <span class="title">Value</span></span></span><br></pre></td></tr></table></figure>
+
+<p>如果知道一个类型值的底层存放地址，则还有一个函数可以依据type和该地址值恢复出Value的。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewAt</span><span class="params">(typ Type, p unsafe.Pointer)</span> <span class="title">Value</span></span></span><br></pre></td></tr></table></figure></li>
+<li><p>从 <code>Value</code> 到 <code>Type</code></p>
+<p>从反射对象 Value到 Type 可以直接调用 Value 的方法，因为 Value 内部存放着到Type类型的指针。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Type</span><span class="params">()</span> <span class="title">Type</span></span></span><br></pre></td></tr></table></figure></li>
+<li><p>从<code>Value</code> 到实例</p>
+<p>Value 本身就包含类型和值信息，reflect 提供了丰富的方法来实现从 Value到实例的转换</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Interface returns v&#x27;s current value as an interface&#123;&#125;.</span></span><br><span class="line"><span class="comment">// It is equivalent to:</span></span><br><span class="line"><span class="comment">//	var i interface&#123;&#125; = (v&#x27;s underlying value)</span></span><br><span class="line"><span class="comment">// It panics if the Value was obtained by accessing</span></span><br><span class="line"><span class="comment">// unexported struct fields.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Interface</span><span class="params">()</span> <span class="params">(i <span class="keyword">interface</span>&#123;&#125;)</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> valueInterface(v, <span class="literal">true</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Bool</span><span class="params">()</span> <span class="title">bool</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Float</span><span class="params">()</span> <span class="title">float64</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Int</span><span class="params">()</span> <span class="title">int64</span></span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Uint</span><span class="params">()</span> <span class="title">uint64</span></span></span><br></pre></td></tr></table></figure></li>
+<li><p>从<code> Value</code> 的指针到值</p>
+<p>从一个指针类型的Value获取值类型Value有两种方法</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Elem returns the value that the interface v contains</span></span><br><span class="line"><span class="comment">// or that the pointer v points to.</span></span><br><span class="line"><span class="comment">// It panics if v&#x27;s Kind is not Interface or Ptr.</span></span><br><span class="line"><span class="comment">// It returns the zero Value if v is nil.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(v Value)</span> <span class="title">Elem</span><span class="params">()</span> <span class="title">Value</span></span> &#123;</span><br><span class="line">	k := v.kind()</span><br><span class="line">	<span class="keyword">switch</span> k &#123;</span><br><span class="line">	<span class="keyword">case</span> Interface:</span><br><span class="line">		<span class="keyword">var</span> eface <span class="keyword">interface</span>&#123;&#125;</span><br><span class="line">		<span class="keyword">if</span> v.typ.NumMethod() == <span class="number">0</span> &#123;</span><br><span class="line">			eface = *(*<span class="keyword">interface</span>&#123;&#125;)(v.ptr)</span><br><span class="line">		&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">			eface = (<span class="keyword">interface</span>&#123;&#125;)(*(*<span class="keyword">interface</span> &#123;</span><br><span class="line">				M()</span><br><span class="line">			&#125;)(v.ptr))</span><br><span class="line">		&#125;</span><br><span class="line">		x := unpackEface(eface)</span><br><span class="line">		<span class="keyword">if</span> x.flag != <span class="number">0</span> &#123;</span><br><span class="line">			x.flag |= v.flag.ro()</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> x</span><br><span class="line">	<span class="keyword">case</span> Ptr:</span><br><span class="line">		ptr := v.ptr</span><br><span class="line">		<span class="keyword">if</span> v.flag&amp;flagIndir != <span class="number">0</span> &#123;</span><br><span class="line">			ptr = *(*unsafe.Pointer)(ptr)</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="comment">// The returned value&#x27;s address is v&#x27;s value.</span></span><br><span class="line">		<span class="keyword">if</span> ptr == <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> Value&#123;&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		tt := (*ptrType)(unsafe.Pointer(v.typ))</span><br><span class="line">		typ := tt.elem</span><br><span class="line">		fl := v.flag&amp;flagRO | flagIndir | flagAddr</span><br><span class="line">		fl |= flag(typ.Kind())</span><br><span class="line">		<span class="keyword">return</span> Value&#123;typ, ptr, fl&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="built_in">panic</span>(&amp;ValueError&#123;<span class="string">&quot;reflect.Value.Elem&quot;</span>, v.kind()&#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Indirect returns the value that v points to.</span></span><br><span class="line"><span class="comment">// If v is a nil pointer, Indirect returns a zero Value.</span></span><br><span class="line"><span class="comment">// If v is not a pointer, Indirect returns v.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Indirect</span><span class="params">(v Value)</span> <span class="title">Value</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> v.Kind() != Ptr &#123;</span><br><span class="line">		<span class="keyword">return</span> v</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> v.Elem()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li><p><code>Type</code> 指针和值的相互转换</p>
+<p>指针类型 Type 到值类型Type</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Elem returns a type&#x27;s element type.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Array, Chan, Map, Ptr, or Slice.</span></span><br><span class="line">Elem() Type</span><br></pre></td></tr></table></figure>
+
+<p>值类型<code>Type</code>到指针类型<code>Type</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// PtrTo returns the pointer type with element t.</span></span><br><span class="line"><span class="comment">// For example, if t represents type Foo, PtrTo(t) represents *Foo.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">PtrTo</span><span class="params">(t Type)</span> <span class="title">Type</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> t.(*rtype).ptrTo()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h2 id="五、深入挖掘rtype"><a href="#五、深入挖掘rtype" class="headerlink" title="五、深入挖掘rtype"></a>五、深入挖掘rtype</h2><p>首先我们看下一个最通用的类型公共信息 <code>rtype</code>，它是每一种基础类型的一个成员类型。</p>
+<p>如果有同学看过 runtime 的源码，那么可能知道，<code>rtype</code> 和 <code>_type</code> 是同一个结构体</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// rtype is the common implementation of most values.</span></span><br><span class="line"><span class="comment">// It is embedded in other struct types.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// rtype must be kept in sync with ../runtime/type.go:/^type._type.</span></span><br><span class="line"><span class="keyword">type</span> rtype <span class="keyword">struct</span> &#123;</span><br><span class="line">	size       <span class="keyword">uintptr</span></span><br><span class="line">	ptrdata    <span class="keyword">uintptr</span> <span class="comment">// number of bytes in the type that can contain pointers</span></span><br><span class="line">	hash       <span class="keyword">uint32</span>  <span class="comment">// hash of type; avoids computation in hash tables</span></span><br><span class="line">	tflag      tflag   <span class="comment">// extra type information flags</span></span><br><span class="line">	align      <span class="keyword">uint8</span>   <span class="comment">// alignment of variable with this type</span></span><br><span class="line">	fieldAlign <span class="keyword">uint8</span>   <span class="comment">// alignment of struct field with this type</span></span><br><span class="line">	kind       <span class="keyword">uint8</span>   <span class="comment">// enumeration for C</span></span><br><span class="line">	<span class="comment">// function for comparing objects of this type</span></span><br><span class="line">	<span class="comment">// (ptr to object A, ptr to object B) -&gt; ==?</span></span><br><span class="line">	equal     <span class="function"><span class="keyword">func</span><span class="params">(unsafe.Pointer, unsafe.Pointer)</span> <span class="title">bool</span></span></span><br><span class="line">	gcdata    *<span class="keyword">byte</span>   <span class="comment">// garbage collection data</span></span><br><span class="line">	str       nameOff <span class="comment">// string form</span></span><br><span class="line">	ptrToThis typeOff <span class="comment">// type for pointer to this type, may be zero</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>它实现了 <code>reflect.Type </code>接口</p>
+<p><img src="/2021/09/12/Laws-of-reflect-in-Golang/image-20210726131124574.png" alt="image-20210726131124574"></p>
+<p>可以看到，其他的基本类型都有一个<code>rtype</code> 类型的成员变量</p>
+<p>关于Type类型中的主要方法</p>
+<ol>
+<li>所有类型通用的方法：</li>
+</ol>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Name returns the type&#x27;s name within its package for a defined type.</span></span><br><span class="line"><span class="comment">// For other (non-defined) types it returns the empty string.</span></span><br><span class="line">Name() <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Kind returns the specific kind of this type.</span></span><br><span class="line">Kind() Kind</span><br><span class="line"></span><br><span class="line"><span class="comment">// Implements reports whether the type implements the interface type u.</span></span><br><span class="line">Implements(u Type) <span class="keyword">bool</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// AssignableTo reports whether a value of the type is assignable to type u.</span></span><br><span class="line">AssignableTo(u Type) <span class="keyword">bool</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ConvertibleTo reports whether a value of the type is convertible to type u.</span></span><br><span class="line">ConvertibleTo(u Type) <span class="keyword">bool</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Comparable reports whether values of this type are comparable.</span></span><br><span class="line">Comparable() <span class="keyword">bool</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Method returns the i&#x27;th method in the type&#x27;s method set.</span></span><br><span class="line"><span class="comment">// It panics if i is not in the range [0, NumMethod()).</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// For a non-interface type T or *T, the returned Method&#x27;s Type and Func</span></span><br><span class="line"><span class="comment">// fields describe a function whose first argument is the receiver.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// For an interface type, the returned Method&#x27;s Type field gives the</span></span><br><span class="line"><span class="comment">// method signature, without a receiver, and the Func field is nil.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// Only exported methods are accessible and they are sorted in</span></span><br><span class="line"><span class="comment">// lexicographic order.</span></span><br><span class="line">Method(<span class="keyword">int</span>) Method</span><br><span class="line"></span><br><span class="line"><span class="comment">// MethodByName returns the method with that name in the type&#x27;s</span></span><br><span class="line"><span class="comment">// method set and a boolean indicating if the method was found.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// For a non-interface type T or *T, the returned Method&#x27;s Type and Func</span></span><br><span class="line"><span class="comment">// fields describe a function whose first argument is the receiver.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// For an interface type, the returned Method&#x27;s Type field gives the</span></span><br><span class="line"><span class="comment">// method signature, without a receiver, and the Func field is nil.</span></span><br><span class="line">MethodByName(<span class="keyword">string</span>) (Method, <span class="keyword">bool</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">// NumMethod returns the number of exported methods in the type&#x27;s method set.</span></span><br><span class="line">NumMethod() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// PkgPath returns a defined type&#x27;s package path, that is, the import path</span></span><br><span class="line"><span class="comment">// that uniquely identifies the package, such as &quot;encoding/base64&quot;.</span></span><br><span class="line"><span class="comment">// If the type was predeclared (string, error) or not defined (*T, struct&#123;&#125;,</span></span><br><span class="line"><span class="comment">// []int, or A where A is an alias for a non-defined type), the package path</span></span><br><span class="line"><span class="comment">// will be the empty string.</span></span><br><span class="line">PkgPath() <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Size returns the number of bytes needed to store</span></span><br><span class="line"><span class="comment">// a value of the given type; it is analogous to unsafe.Sizeof.</span></span><br><span class="line">Size() <span class="keyword">uintptr</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// String returns a string representation of the type.</span></span><br><span class="line"><span class="comment">// The string representation may use shortened package names</span></span><br><span class="line"><span class="comment">// (e.g., base64 instead of &quot;encoding/base64&quot;) and is not</span></span><br><span class="line"><span class="comment">// guaranteed to be unique among types. To test for type identity,</span></span><br><span class="line"><span class="comment">// compare the Types directly.</span></span><br><span class="line">String() <span class="keyword">string</span></span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>不同基础类型的专有方法</li>
+</ol>
+<ul>
+<li><code>Int*</code>,<code>Uint*</code>, <code>Float*</code>, <code>Complex*</code>: Bits</li>
+<li>Array: Elem, Len</li>
+<li>Chan: ChanDir, Elem</li>
+<li>Func: In, NumIn, Out, NumOut, IsVariadic.</li>
+<li>Map: Key, Elem</li>
+<li>Ptr: Elem</li>
+<li>Slice: Elem</li>
+<li>Struct: Field, FieldByIndex, FieldByName, FieldByNameFunc, NumField</li>
+</ul>
+<p>如果调用错误，那么会panic</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Bits returns the size of the type in bits.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not one of the</span></span><br><span class="line"><span class="comment">// sized or unsized Int, Uint, Float, or Complex kinds.</span></span><br><span class="line">Bits() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ChanDir returns a channel type&#x27;s direction.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Chan.</span></span><br><span class="line">ChanDir() ChanDir</span><br><span class="line"></span><br><span class="line"><span class="comment">// IsVariadic reports whether a function type&#x27;s final input parameter</span></span><br><span class="line"><span class="comment">// is a &quot;...&quot; parameter. If so, t.In(t.NumIn() - 1) returns the parameter&#x27;s</span></span><br><span class="line"><span class="comment">// implicit actual type []T.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// For concreteness, if t represents func(x int, y ... float64), then</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//	t.NumIn() == 2</span></span><br><span class="line"><span class="comment">//	t.In(0) is the reflect.Type for &quot;int&quot;</span></span><br><span class="line"><span class="comment">//	t.In(1) is the reflect.Type for &quot;[]float64&quot;</span></span><br><span class="line"><span class="comment">//	t.IsVariadic() == true</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// IsVariadic panics if the type&#x27;s Kind is not Func.</span></span><br><span class="line">IsVariadic() <span class="keyword">bool</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Elem returns a type&#x27;s element type.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Array, Chan, Map, Ptr, or Slice.</span></span><br><span class="line">Elem() Type</span><br><span class="line"></span><br><span class="line"><span class="comment">// Field returns a struct type&#x27;s i&#x27;th field.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Struct.</span></span><br><span class="line"><span class="comment">// It panics if i is not in the range [0, NumField()).</span></span><br><span class="line">Field(i <span class="keyword">int</span>) StructField</span><br><span class="line"></span><br><span class="line"><span class="comment">// FieldByIndex returns the nested field corresponding</span></span><br><span class="line"><span class="comment">// to the index sequence. It is equivalent to calling Field</span></span><br><span class="line"><span class="comment">// successively for each index i.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Struct.</span></span><br><span class="line">FieldByIndex(index []<span class="keyword">int</span>) StructField</span><br><span class="line"></span><br><span class="line"><span class="comment">// FieldByName returns the struct field with the given name</span></span><br><span class="line"><span class="comment">// and a boolean indicating if the field was found.</span></span><br><span class="line">FieldByName(name <span class="keyword">string</span>) (StructField, <span class="keyword">bool</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">// FieldByNameFunc returns the struct field with a name</span></span><br><span class="line"><span class="comment">// that satisfies the match function and a boolean indicating if</span></span><br><span class="line"><span class="comment">// the field was found.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// FieldByNameFunc considers the fields in the struct itself</span></span><br><span class="line"><span class="comment">// and then the fields in any embedded structs, in breadth first order,</span></span><br><span class="line"><span class="comment">// stopping at the shallowest nesting depth containing one or more</span></span><br><span class="line"><span class="comment">// fields satisfying the match function. If multiple fields at that depth</span></span><br><span class="line"><span class="comment">// satisfy the match function, they cancel each other</span></span><br><span class="line"><span class="comment">// and FieldByNameFunc returns no match.</span></span><br><span class="line"><span class="comment">// This behavior mirrors Go&#x27;s handling of name lookup in</span></span><br><span class="line"><span class="comment">// structs containing embedded fields.</span></span><br><span class="line">FieldByNameFunc(match <span class="function"><span class="keyword">func</span><span class="params">(<span class="keyword">string</span>)</span> <span class="title">bool</span>) <span class="params">(StructField, <span class="keyword">bool</span>)</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// In returns the type of a function type&#x27;s i&#x27;th input parameter.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Func.</span></span><br><span class="line"><span class="comment">// It panics if i is not in the range [0, NumIn()).</span></span><br><span class="line">In(i <span class="keyword">int</span>) Type</span><br><span class="line"></span><br><span class="line"><span class="comment">// Key returns a map type&#x27;s key type.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Map.</span></span><br><span class="line">Key() Type</span><br><span class="line"></span><br><span class="line"><span class="comment">// Len returns an array type&#x27;s length.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Array.</span></span><br><span class="line">Len() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// NumField returns a struct type&#x27;s field count.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Struct.</span></span><br><span class="line">NumField() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// NumIn returns a function type&#x27;s input parameter count.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Func.</span></span><br><span class="line">NumIn() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// NumOut returns a function type&#x27;s output parameter count.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Func.</span></span><br><span class="line">NumOut() <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Out returns the type of a function type&#x27;s i&#x27;th output parameter.</span></span><br><span class="line"><span class="comment">// It panics if the type&#x27;s Kind is not Func.</span></span><br><span class="line"><span class="comment">// It panics if i is not in the range [0, NumOut()).</span></span><br><span class="line">Out(i <span class="keyword">int</span>) Type</span><br></pre></td></tr></table></figure>
+
+<p>Go 定义了26个基本类型 </p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// A Kind represents the specific kind of type that a Type represents.</span></span><br><span class="line"><span class="comment">// The zero Kind is not a valid kind.</span></span><br><span class="line"><span class="keyword">type</span> Kind <span class="keyword">uint</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> (</span><br><span class="line">	Invalid Kind = <span class="literal">iota</span></span><br><span class="line">	Bool</span><br><span class="line">	Int</span><br><span class="line">	Int8</span><br><span class="line">	Int16</span><br><span class="line">	Int32</span><br><span class="line">	Int64</span><br><span class="line">	Uint</span><br><span class="line">	Uint8</span><br><span class="line">	Uint16</span><br><span class="line">	Uint32</span><br><span class="line">	Uint64</span><br><span class="line">	Uintptr</span><br><span class="line">	Float32</span><br><span class="line">	Float64</span><br><span class="line">	Complex64</span><br><span class="line">	Complex128</span><br><span class="line">	Array</span><br><span class="line">	Chan</span><br><span class="line">	Func</span><br><span class="line">	Interface</span><br><span class="line">	Map</span><br><span class="line">	Ptr</span><br><span class="line">	Slice</span><br><span class="line">	String</span><br><span class="line">	Struct</span><br><span class="line">	UnsafePointer</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>一些常见基本类型的Type 实现</p>
+<ul>
+<li>arrayType</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// arrayType represents a fixed array type.</span></span><br><span class="line"><span class="keyword">type</span> arrayType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	elem  *rtype <span class="comment">// array element type</span></span><br><span class="line">	slice *rtype <span class="comment">// slice type</span></span><br><span class="line">	<span class="built_in">len</span>   <span class="keyword">uintptr</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li> chanType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// chanType represents a channel type.</span></span><br><span class="line"><span class="keyword">type</span> chanType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	elem *rtype  <span class="comment">// channel element type</span></span><br><span class="line">	dir  <span class="keyword">uintptr</span> <span class="comment">// channel direction (ChanDir)</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li> funcType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// funcType represents a function type.</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">// A *rtype for each in and out parameter is stored in an array that</span></span><br><span class="line"><span class="comment">// directly follows the funcType (and possibly its uncommonType). So</span></span><br><span class="line"><span class="comment">// a function type with one method, one input, and one output is:</span></span><br><span class="line"><span class="comment">//</span></span><br><span class="line"><span class="comment">//	struct &#123;</span></span><br><span class="line"><span class="comment">//		funcType</span></span><br><span class="line"><span class="comment">//		uncommonType</span></span><br><span class="line"><span class="comment">//		[2]*rtype    // [0] is in, [1] is out</span></span><br><span class="line"><span class="comment">//	&#125;</span></span><br><span class="line"><span class="keyword">type</span> funcType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	inCount  <span class="keyword">uint16</span></span><br><span class="line">	outCount <span class="keyword">uint16</span> <span class="comment">// top bit is set if last input parameter is ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li> interfaceType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// interfaceType represents an interface type.</span></span><br><span class="line"><span class="keyword">type</span> interfaceType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	pkgPath name      <span class="comment">// import path</span></span><br><span class="line">	methods []imethod <span class="comment">// sorted by hash</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li> mapType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// mapType represents a map type.</span></span><br><span class="line"><span class="keyword">type</span> mapType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	key    *rtype <span class="comment">// map key type</span></span><br><span class="line">	elem   *rtype <span class="comment">// map element (value) type</span></span><br><span class="line">	bucket *rtype <span class="comment">// internal bucket structure</span></span><br><span class="line">	<span class="comment">// function for hashing keys (ptr to key, seed) -&gt; hash</span></span><br><span class="line">	hasher     <span class="function"><span class="keyword">func</span><span class="params">(unsafe.Pointer, <span class="keyword">uintptr</span>)</span> <span class="title">uintptr</span></span></span><br><span class="line">	keysize    <span class="keyword">uint8</span>  <span class="comment">// size of key slot</span></span><br><span class="line">	valuesize  <span class="keyword">uint8</span>  <span class="comment">// size of value slot</span></span><br><span class="line">	bucketsize <span class="keyword">uint16</span> <span class="comment">// size of bucket</span></span><br><span class="line">	flags      <span class="keyword">uint32</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li> ptrType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ptrType represents a pointer type.</span></span><br><span class="line"><span class="keyword">type</span> ptrType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	elem *rtype <span class="comment">// pointer element (pointed at) type</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li> sliceType<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// sliceType represents a slice type.</span></span><br><span class="line"><span class="keyword">type</span> sliceType <span class="keyword">struct</span> &#123;</span><br><span class="line">	rtype</span><br><span class="line">	elem *rtype <span class="comment">// slice element type</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="六、反射的优缺点"><a href="#六、反射的优缺点" class="headerlink" title="六、反射的优缺点"></a>六、反射的优缺点</h2><h3 id="6-1-优点"><a href="#6-1-优点" class="headerlink" title="6.1 优点"></a>6.1 优点</h3><ol>
+<li><p><strong>通用性</strong></p>
+<p>特别是一些类库和框架代码需要一种通用的处理模式，而不是针对每一种场景做硬编码处理，此时借助反射可以极大简化设计</p>
+</li>
+<li><p><strong>灵活性</strong></p>
+<p>反射提供了一种程序了解自己和改变自己的能力，这为一些测试工具的开发提供了有力的支持。</p>
+</li>
+</ol>
+<h3 id="6-2-缺点"><a href="#6-2-缺点" class="headerlink" title="6.2 缺点"></a>6.2 缺点</h3><ol>
+<li><p><strong>反射是脆弱的</strong></p>
+<p>由于反射可以在程序运行时修改程序的状态，这种修改没有经过编译器的严格检查，不正确的修改很容易导致程序的崩溃</p>
+</li>
+<li><p><strong>反射是晦涩难懂的</strong></p>
+<p>语言的反射接口由于涉及语言的运行时，没有具体的类型系统的约束，接口的抽象级别高但实现细节复杂，导致使用反射的代码难以理解</p>
+</li>
+<li><p><strong>反射有部分性能损失</strong></p>
+<p>反射提供动态修改程序状态的能力，必然不是直接的地址引用，而是要借助运行时构造一个抽象层，这种间接访问会有性能的损失</p>
+</li>
+</ol>
+<h3 id="6-3-Best-Practice"><a href="#6-3-Best-Practice" class="headerlink" title="6.3 Best Practice"></a>6.3 Best Practice</h3><ol>
+<li>在<strong>库或框架内部</strong>使用反射，而不是把反射接口暴露给调用者，复杂性留在内部，简单性放到接口</li>
+<li><strong>框架代码</strong>才考虑使用反射，一般的业务代码没有抽象到反射的层次，这种过度设计会带来复杂度的提升，使得代码难以维护</li>
+<li>除非<strong>没有其他办法</strong>，否则<strong>不要使用</strong>反射技术</li>
+</ol>
+<p>参考资料：</p>
+<ol>
+<li><p>《<a target="_blank" rel="noopener" href="https://blog.golang.org/laws-of-reflection">The Laws of Reflection</a>》</p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://golang.org/pkg/reflect/">src/reflect</a></p>
+</li>
+<li><p>《<a target="_blank" rel="noopener" href="https://book.jd.com/writer/Search?keyword=go%E8%AF%AD%E8%A8%80%E6%A0%B8%E5%BF%83%E7%BC%96%E7%A8%8B&enc=utf-8&spm=2.1.8">Go 核心编程</a>》</p>
+</li>
+</ol>
+
+
+                <hr>
+
+                
+
+                <ul class="pager">
+                    
+                    
+                        <li class="next">
+                            <a href="/2021/09/10/Start/" data-toggle="tooltip" data-placement="top" title="重新出发，我回来了">Next Post &rarr;</a>
+                        </li>
+                    
+                </ul>
+
+                
+
+                
+
+            </div>
+    <!-- Side Catalog Container -->
+        
+
+    <!-- Sidebar Container -->
+
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                sidebar-container">
+
+                <!-- Featured Tags -->
+                
+
+                <!-- Friends Blog -->
+                
+            </div>
+
+        </div>
+    </div>
+</article>
+
+
+
+
+
+
+
+
+
+    <!-- Footer -->
+    <!-- Footer -->
+<footer>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <ul class="list-inline text-center">
+                
+                
+                
+                    <li>
+                        <a target="_blank" href="https://www.zhihu.com/people/po-xiao-chen">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa  fa-stack-1x fa-inverse">知</i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+
+                
+                    <li>
+                        <a target="_blank" href="https://www.facebook.com/eachen.kuang.0">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://github.com/EachenKuang">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://www.linkedin.com/in/奕臣-匡-906b52125">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                </ul>
+                <p class="copyright text-muted">
+                    Copyright &copy; 易浅的世界 2021 
+                    <br>
+                    Theme by <a target="_blank" rel="noopener" href="http://huangxuan.me">Hux</a> 
+                    <span style="display: inline-block; margin: 0 5px;">
+                        <i class="fa fa-heart"></i>
+                    </span> 
+                    Ported by <a target="_blank" rel="noopener" href="http://blog.kaijun.rocks">Kaijun</a> | 
+                    <iframe
+                        style="margin-left: 2px; margin-bottom:-5px;"
+                        frameborder="0" scrolling="0" width="91px" height="20px"
+                        src="https://ghbtns.com/github-btn.html?user=kaijun&repo=hexo-theme-huxblog&type=star&count=true" >
+                    </iframe>
+                </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- jQuery -->
+
+<script src="/js/jquery.min.js"></script>
+
+
+<!-- Bootstrap Core JavaScript -->
+
+<script src="/js/bootstrap.min.js"></script>
+
+
+<!-- Custom Theme JavaScript -->
+
+<script src="/js/hux-blog.min.js"></script>
+
+
+
+<!-- async load function -->
+<script>
+    function async(u, c) {
+      var d = document, t = 'script',
+          o = d.createElement(t),
+          s = d.getElementsByTagName(t)[0];
+      o.src = u;
+      if (c) { o.addEventListener('load', function (e) { c(null, e); }, false); }
+      s.parentNode.insertBefore(o, s);
+    }
+</script>
+
+<!-- 
+     Because of the native support for backtick-style fenced code blocks 
+     right within the Markdown is landed in Github Pages, 
+     From V1.6, There is no need for Highlight.js, 
+     so Huxblog drops it officially.
+
+     - https://github.com/blog/2100-github-pages-now-faster-and-simpler-with-jekyll-3-0  
+     - https://help.github.com/articles/creating-and-highlighting-code-blocks/    
+-->
+<!--
+    <script>
+        async("http://cdn.bootcss.com/highlight.js/8.6/highlight.min.js", function(){
+            hljs.initHighlightingOnLoad();
+        })
+    </script>
+    <link href="http://cdn.bootcss.com/highlight.js/8.6/styles/github.min.css" rel="stylesheet">
+-->
+
+
+<!-- jquery.tagcloud.js -->
+<script>
+    // only load tagcloud.js in tag.html
+    if($('#tag_cloud').length !== 0){
+        async("https://eachenkuang.github.io/js/jquery.tagcloud.js",function(){
+            $.fn.tagcloud.defaults = {
+                //size: {start: 1, end: 1, unit: 'em'},
+                color: {start: '#bbbbee', end: '#0085a1'},
+            };
+            $('#tag_cloud a').tagcloud();
+        })
+    }
+</script>
+
+<!--fastClick.js -->
+<script>
+    async("https://cdn.bootcss.com/fastclick/1.0.6/fastclick.min.js", function(){
+        var $nav = document.querySelector("nav");
+        if($nav) FastClick.attach($nav);
+    })
+</script>
+
+
+<!-- Google Analytics -->
+
+
+
+
+<!-- Baidu Tongji -->
+
+
+<!-- Side Catalog -->
+
+
+
+
+
+<!-- Image to hack wechat -->
+<img src="https://eachenkuang.github.io/img/icon_wechat.png" width="0" height="0" />
+<!-- Migrate from head to bottom, no longer block render and still work -->
+
+</body>
+
+</html>
