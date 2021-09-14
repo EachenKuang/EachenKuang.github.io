@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Head tag -->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="google-site-verification" content="xBT4GhYoi5qRD5tr338pgPM5OWHHIDR6mNg1a3euekI" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="thinking, learning, running">
+    <meta name="keyword"  content="">
+    <link rel="shortcut icon" href="/img/favicon.ico">
+
+    <title>
+        
+          Redis 协议详细规范 - 易浅的世界 | Eachen&#39;s World
+        
+    </title>
+
+    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/14/RESP/">
+
+    <!-- Bootstrap Core CSS -->
+    
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+
+
+    <!-- Custom CSS -->
+    
+<link rel="stylesheet" href="/css/hux-blog.min.css">
+
+
+    <!-- Pygments Highlight CSS -->
+    
+<link rel="stylesheet" href="/css/highlight.css">
+
+
+    <!-- Custom Fonts -->
+    <!-- <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css"> -->
+    <!-- Hux change font-awesome CDN to qiniu -->
+    <link href="https://cdn.staticfile.org/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+
+    <!-- Hux Delete, sad but pending in China
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/
+    css'>
+    -->
+
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- ga & ba script hoook -->
+    <script></script>
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+
+<!-- hack iOS CSS :active style -->
+<body ontouchstart="">
+
+    <!-- Navigation -->
+<nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+    <div class="container-fluid">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header page-scroll">
+            <button type="button" class="navbar-toggle">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/">易浅的世界</a>
+        </div>
+
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <!-- Known Issue, found by Hux:
+            <nav>'s height woule be hold on by its content.
+            so, when navbar scale out, the <nav> will cover tags.
+            also mask any touch event of tags, unfortunately.
+        -->
+        <div id="huxblog_navbar">
+            <div class="navbar-collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="/">Home</a>
+                    </li>
+
+                    
+
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/about/">About</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/tags/">Tags</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/archives/">Archives</a>
+                        </li>
+                        
+                    
+                    
+                </ul>
+            </div>
+        </div>
+        <!-- /.navbar-collapse -->
+    </div>
+    <!-- /.container -->
+</nav>
+<script>
+    // Drop Bootstarp low-performance Navbar
+    // Use customize navbar with high-quality material design animation
+    // in high-perf jank-free CSS3 implementation
+    var $body   = document.body;
+    var $toggle = document.querySelector('.navbar-toggle');
+    var $navbar = document.querySelector('#huxblog_navbar');
+    var $collapse = document.querySelector('.navbar-collapse');
+
+    $toggle.addEventListener('click', handleMagic)
+    function handleMagic(e){
+        if ($navbar.className.indexOf('in') > 0) {
+        // CLOSE
+            $navbar.className = " ";
+            // wait until animation end.
+            setTimeout(function(){
+                // prevent frequently toggle
+                if($navbar.className.indexOf('in') < 0) {
+                    $collapse.style.height = "0px"
+                }
+            },400)
+        }else{
+        // OPEN
+            $collapse.style.height = "auto"
+            $navbar.className += " in";
+        }
+    }
+</script>
+
+
+    <!-- Main Content -->
+    
+<!-- Image to hack wechat -->
+<!-- <img src="https://eachenkuang.github.io/img/icon_wechat.png" width="0" height="0"> -->
+<!-- <img src="{{ site.baseurl }}/{% if page.header-img %}{{ page.header-img }}{% else %}{{ site.header-img }}{% endif %}" width="0" height="0"> -->
+
+<!-- Post Header -->
+<style type="text/css">
+    header.intro-header{
+        background-image: url('/img/home-bg.jpg')
+    }
+</style>
+<header class="intro-header" >
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <div class="post-heading">
+                    <div class="tags">
+                        
+                          <a class="tag" href="/tags/#redis" title="redis">redis</a>
+                        
+                    </div>
+                    <h1>Redis 协议详细规范</h1>
+                    <h2 class="subheading"></h2>
+                    <span class="meta">
+                        Posted by Eachen Kuang on
+                        2021-09-14
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Post Content -->
+<article>
+    <div class="container">
+        <div class="row">
+
+    <!-- Post Container -->
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                post-container">
+
+                <h1 id="Redis-协议详细规范"><a href="#Redis-协议详细规范" class="headerlink" title="Redis 协议详细规范"></a>Redis 协议详细规范</h1><p><a target="_blank" rel="noopener" href="https://redis.io/topics/protocol">Redis Protocol specification – Redis</a></p>
+<p>Redis客户端和服务器端通信使用名为 <strong>RESP</strong> (REdis Serialization Protocol) 的协议。虽然这个协议是专门为Redis设计的，它也可以用在其它 client-server 通信模式的软件上。</p>
+<p>RESP 是下面条件的折中：</p>
+<ul>
+<li>实现起来简单。</li>
+<li>解析速度快。</li>
+<li>有可读性。</li>
+</ul>
+<p><code>RESP</code> 能序列化不同的数据类型，例如整型(integers)、字符串(strings)、数组(arrays)。额外还有特殊的错误类型。请求从客户端以字符串数组的形式发送到redis服务器，这些字符串表示要执行的命令的参数。Redis用特定于命令的数据类型回复。</p>
+<p><code>RESP</code> 是<strong>二进制安全</strong>的，并且不需要处理从一个进程发到另外一个进程的批量数据，因为它使用前缀长度来传输批量数据。</p>
+<p>注意：这里概述的协议仅用于<strong>客户机-服务器</strong>通信。Redis集群使用不同的二进制协议在节点之间交换消息。</p>
+<h2 id="网络层（Networking-layer）"><a href="#网络层（Networking-layer）" class="headerlink" title="网络层（Networking layer）"></a>网络层（Networking layer）</h2><p>默认情况下，连到Redis服务器的客户端会建立了一个到<code>6379</code>端口的TCP连接。</p>
+<p>虽然RESP在技术上不特定于TCP，但是在Redis的上下文中，该协议仅用于TCP连接（或类似的面向流的连接，如unix套接字）。</p>
+<h2 id="请求-响应模型（-Request-Response-model）"><a href="#请求-响应模型（-Request-Response-model）" class="headerlink" title="请求-响应模型（ Request-Response model）"></a>请求-响应模型（ Request-Response model）</h2><p>Redis接受由不同参数组成的命令。一旦收到命令，就会对其进行处理，并将应答发送回客户端。</p>
+<p>这是最简单的模型，但是有两个例外：</p>
+<ul>
+<li><strong>管道模式下</strong>。Redis 支持管道（pipelining）。所以，客户端可以一次发送多个命令，然后再等待应答。</li>
+<li><strong>发布订阅模式下</strong>。当一个Redis客户端订阅一个频道，那么协议会改变语义并变成<code>push protocol</code>, 也就是说，客户客户端不再需要发送命令，因为服务器端会一收到新消息，就会自动发送给客户端。</li>
+</ul>
+<p>除了上面两个例外情况，Redis协议是一个简单的请求-响应协议。</p>
+<h2 id="RESP-协议解释"><a href="#RESP-协议解释" class="headerlink" title="RESP 协议解释"></a>RESP 协议解释</h2><blockquote>
+<p>RESP 协议在Redis1.2被引入，直到Redis2.0才成为和Redis服务器通信的标准。</p>
+</blockquote>
+<p><img src="/2021/09/14/RESP/RESP%E5%8D%8F%E8%AE%AE%E5%9B%BE%E7%A4%BA.png" alt="RESP协议图示"></p>
+<p><code>RESP</code> 是一个支持多种数据类型的序列化协议：</p>
+<ul>
+<li>简单字符串（Simple Strings），也被翻译为“单行字符串”</li>
+<li>错误（ Errors）</li>
+<li>整型（ Integers）</li>
+<li>大容量字符串（Bulk Strings），也被翻译为“多行字符串”</li>
+<li>数组（Arrays）</li>
+</ul>
+<p>如上图所示，<code>RESP</code>在Redis中作为一个请求-响应协议以如下方式使用：</p>
+<ul>
+<li>客户端以<code>Bulk Strings</code>组成的<code>RESP Arrays</code>的方式发送命令给服务器端。</li>
+<li>服务器端根据命令的具体实现返回某一种RESP数据类型。</li>
+</ul>
+<h2 id="RESP-Simple-Strings"><a href="#RESP-Simple-Strings" class="headerlink" title="RESP Simple Strings"></a>RESP Simple Strings</h2><p>编码方式：</p>
+<ul>
+<li><p>加号 与 实际字符串 与 CRLF 结尾 =&gt;</p>
+</li>
+<li><p><code>+</code> + <code>实际字符串</code>+ <code>\r\n</code></p>
+<p>例如：</p>
+   <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">+OK\r\n</span><br></pre></td></tr></table></figure></li>
+</ul>
+<blockquote>
+<p>注意：实际字符串中不允许包含回车换行符</p>
+</blockquote>
+<p>如果需要发送二进制安全的字符串，应该选择使用RESP的大容量字符串（Bulk Strings）替代。</p>
+<h2 id="RESP-Errors"><a href="#RESP-Errors" class="headerlink" title="RESP Errors"></a>RESP Errors</h2><p>编码方式：</p>
+<ul>
+<li><p>减号 与 错误字符串 与 CRLF 结尾 =&gt;</p>
+</li>
+<li><p><code>-</code> + <code>错误字符串</code> +<code>\r\n</code></p>
+<p>例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-Error message\r\n</span><br></pre></td></tr></table></figure></li>
+</ul>
+<p>Errors 用于在发生异常时传输</p>
+<h2 id="RESP-Integers"><a href="#RESP-Integers" class="headerlink" title="RESP Integers"></a>RESP Integers</h2><p>编码方式：</p>
+<ul>
+<li><p>冒号 与 字符串形式的数字 与 CRLF 结尾 =&gt;</p>
+</li>
+<li><p><code>:</code> + <code>数字字符串</code> + <code>\r\n</code></p>
+<p>例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">:1\r\n</span><br><span class="line">:0\r\n</span><br></pre></td></tr></table></figure></li>
+</ul>
+<blockquote>
+<p>注意：返回的整数有效值需要在有符号64位整数范围内。</p>
+</blockquote>
+<h2 id="RESP-Bulk-Strings"><a href="#RESP-Bulk-Strings" class="headerlink" title="RESP Bulk Strings"></a>RESP Bulk Strings</h2><p>编码方式由三部分组成：</p>
+<ul>
+<li><p>第一部分：美元符号 与 组成字符串的字节数 与 CRLF 结尾</p>
+</li>
+<li><p>第二部分：实际的字符串数据</p>
+</li>
+<li><p>第三部分：CRLF 即为</p>
+<p>例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$6\r\n</span><br><span class="line">greate</span><br><span class="line">\r\n</span><br></pre></td></tr></table></figure>
+
+<p>为了便于显示，上面以换行处理各部分字符，实际中传输使用的是如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$6\r\ngreate\r\n</span><br></pre></td></tr></table></figure></li>
+</ul>
+<p>注意：</p>
+<p>有两种特殊形式的 Bulk Strings：</p>
+<ul>
+<li><p>空串（数据分布长度为0，表示空串””）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$0\r\n</span><br></pre></td></tr></table></figure></li>
+<li><p><strong>Null Bulk String</strong>（在这种格式里长度值为-1，数据部分不存在，所以为Null）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$-1\r\n</span><br></pre></td></tr></table></figure></li>
+</ul>
+<blockquote>
+<p>大容量字符串被用来表示最长512MB的<strong>二进制安全</strong>字符串。</p>
+</blockquote>
+<h2 id="RESP-Arrays"><a href="#RESP-Arrays" class="headerlink" title="RESP Arrays"></a>RESP Arrays</h2><p>编码方式：</p>
+<ul>
+<li>第一部分：星号 与 数组元素的个数的十进制数 与 CRLF 结尾</li>
+<li>第二部分：数组中每个 RESP 类型的元素（按照上面提到的各种类型的编码方式）</li>
+</ul>
+<p>示例：</p>
+<ul>
+<li><p>空数组</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*0\r\n</span><br></pre></td></tr></table></figure></li>
+<li><p>正常数组</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*3\r\n:1\r\n:2\r\n:3\r\n</span><br></pre></td></tr></table></figure>
+
+<p>对应 [1,2,3] </p>
+</li>
+<li><p>带多种类型的嵌套数组</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">*2\r\n</span><br><span class="line">*3\r\n</span><br><span class="line">:1\r\n</span><br><span class="line">:2\r\n</span><br><span class="line">:3\r\n</span><br><span class="line">*2\r\n</span><br><span class="line">+Foo\r\n</span><br><span class="line">-Bar\r\n</span><br></pre></td></tr></table></figure>
+
+<p>(为了方便阅读，分成多行来展示).</p>
+<p>对应 [[1, 2, 3], [“Foo”, “Bar”]]</p>
+</li>
+<li><p>NULL数组（由于历史原因，还存在NULL 值的数组，通常使用 NULL Bulk Strings）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*-1\r\n</span><br></pre></td></tr></table></figure></li>
+<li><p>数组中的Null 元素</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">*3\r\n</span><br><span class="line">$3\r\n</span><br><span class="line">foo\r\n</span><br><span class="line">$-1\r\n</span><br><span class="line">$3\r\n</span><br><span class="line">bar\r\n</span><br></pre></td></tr></table></figure>
+
+<p>(为了方便阅读，分成多行来展示)</p>
+<p>对应 [“foo”, Null, “bar”]</p>
+</li>
+</ul>
+<h2 id="发送命令到Redis服务器"><a href="#发送命令到Redis服务器" class="headerlink" title="发送命令到Redis服务器"></a>发送命令到Redis服务器</h2><p>至此，我们已经很熟悉RESP序列化格式，写一个Redis客户端库的实现会变得很容易。我们可以进一步说明客户端和服务端如何交互工作：</p>
+<ul>
+<li>客户端发送包含只有多行字符串的数组给Redis服务器。</li>
+<li>Redis 服务器给客户端发送任意有效的 RESP 数据类型作为应答。</li>
+</ul>
+<p>下面是一个典型的交互过程例子：</p>
+<p>客户端发送命令 <code>LLEN mylist</code> 来获取存储在 <code>mylist</code> 键中列表的长读，然后服务器端返回整数应答(C: 代表客户端, S: 代表服务器端).</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">C: *2\r\n</span><br><span class="line">C: $4\r\n</span><br><span class="line">C: LLEN\r\n</span><br><span class="line">C: $6\r\n</span><br><span class="line">C: mylist\r\n</span><br><span class="line"></span><br><span class="line">S: :48293\r\n</span><br></pre></td></tr></table></figure>
+
+<p>​    为了方便理解我们用换行把协议分成不同部分，实际上客户端发送的是一个整体没有换行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n</span><br></pre></td></tr></table></figure>
+
+<p>如果想体现使用RESP来编写命令的话，可以下载 netcat 工具体验一把。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install nc</span><br></pre></td></tr></table></figure>
+
+<p>首先需要有一个运行的 redis-server</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis-server</span><br></pre></td></tr></table></figure>
+
+<p>然后就可以操作了</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&gt; echo -e &quot;*1\r\n\$4\r\nPING\r\n&quot; | nc 127.0.0.1 6379</span><br><span class="line">+PONG</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="管道和多个命令"><a href="#管道和多个命令" class="headerlink" title="管道和多个命令"></a>管道和多个命令</h2><p>客户端可以使用同一个连接发送多个命令。通过管道客户端可以一次写操作发送多个命令，发送下一个命令前不需要等待前一个命令的应答。所有应答可以在最后被读取。</p>
+<p>关于管道详细参考 <a target="_blank" rel="noopener" href="https://redis.io/topics/pipelining">page about Pipelining</a>.</p>
+<h2 id="内联命令"><a href="#内联命令" class="headerlink" title="内联命令"></a>内联命令</h2><p>有时你手边只能操作<code>telnet</code> 并且需要给Redis 服务器端发送命令。虽然Redis协议是容易实现的，但并不适合用在交互会话。<code>redis-cli</code> 也不是随时都能可用。因此，redis还以一种特殊的方式接受为人类设计的命令，称为内联命令格式。</p>
+<p> 以下是使用内联命令进行服务器/客户端聊天的示例（服务器聊天以s开头，客户端聊天以c开头）。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">C: PING</span><br><span class="line">S: +PONG</span><br></pre></td></tr></table></figure>
+
+<p>以下是返回整数的内联命令的另一个示例：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">C: EXISTS somekey</span><br><span class="line">S: :0</span><br></pre></td></tr></table></figure>
+
+<p>基本上，您只需在telnet会话中编写空格分隔的参数。由于统一请求协议中没有以*开头的命令，因此Redis能够检测到这种情况并解析您的命令。</p>
+
+
+                <hr>
+
+                
+
+                <ul class="pager">
+                    
+                    
+                        <li class="next">
+                            <a href="/2021/09/12/Laws-of-reflect-in-Golang/" data-toggle="tooltip" data-placement="top" title="初探Go反射三大定律">Next Post &rarr;</a>
+                        </li>
+                    
+                </ul>
+
+                
+
+                
+
+            </div>
+    <!-- Side Catalog Container -->
+        
+
+    <!-- Sidebar Container -->
+
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                sidebar-container">
+
+                <!-- Featured Tags -->
+                
+
+                <!-- Friends Blog -->
+                
+            </div>
+
+        </div>
+    </div>
+</article>
+
+
+
+
+
+
+
+
+
+    <!-- Footer -->
+    <!-- Footer -->
+<footer>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <ul class="list-inline text-center">
+                
+                
+                
+                    <li>
+                        <a target="_blank" href="https://www.zhihu.com/people/po-xiao-chen">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa  fa-stack-1x fa-inverse">知</i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+
+                
+                    <li>
+                        <a target="_blank" href="https://www.facebook.com/eachen.kuang.0">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://github.com/EachenKuang">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://www.linkedin.com/in/奕臣-匡-906b52125">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                </ul>
+                <p class="copyright text-muted">
+                    Copyright &copy; 易浅的世界 2021 
+                    <br>
+                    Theme by <a target="_blank" rel="noopener" href="http://huangxuan.me">Hux</a> 
+                    <span style="display: inline-block; margin: 0 5px;">
+                        <i class="fa fa-heart"></i>
+                    </span> 
+                    Ported by <a target="_blank" rel="noopener" href="http://blog.kaijun.rocks">Kaijun</a> | 
+                    <iframe
+                        style="margin-left: 2px; margin-bottom:-5px;"
+                        frameborder="0" scrolling="0" width="91px" height="20px"
+                        src="https://ghbtns.com/github-btn.html?user=kaijun&repo=hexo-theme-huxblog&type=star&count=true" >
+                    </iframe>
+                </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- jQuery -->
+
+<script src="/js/jquery.min.js"></script>
+
+
+<!-- Bootstrap Core JavaScript -->
+
+<script src="/js/bootstrap.min.js"></script>
+
+
+<!-- Custom Theme JavaScript -->
+
+<script src="/js/hux-blog.min.js"></script>
+
+
+
+<!-- async load function -->
+<script>
+    function async(u, c) {
+      var d = document, t = 'script',
+          o = d.createElement(t),
+          s = d.getElementsByTagName(t)[0];
+      o.src = u;
+      if (c) { o.addEventListener('load', function (e) { c(null, e); }, false); }
+      s.parentNode.insertBefore(o, s);
+    }
+</script>
+
+<!-- 
+     Because of the native support for backtick-style fenced code blocks 
+     right within the Markdown is landed in Github Pages, 
+     From V1.6, There is no need for Highlight.js, 
+     so Huxblog drops it officially.
+
+     - https://github.com/blog/2100-github-pages-now-faster-and-simpler-with-jekyll-3-0  
+     - https://help.github.com/articles/creating-and-highlighting-code-blocks/    
+-->
+<!--
+    <script>
+        async("http://cdn.bootcss.com/highlight.js/8.6/highlight.min.js", function(){
+            hljs.initHighlightingOnLoad();
+        })
+    </script>
+    <link href="http://cdn.bootcss.com/highlight.js/8.6/styles/github.min.css" rel="stylesheet">
+-->
+
+
+<!-- jquery.tagcloud.js -->
+<script>
+    // only load tagcloud.js in tag.html
+    if($('#tag_cloud').length !== 0){
+        async("https://eachenkuang.github.io/js/jquery.tagcloud.js",function(){
+            $.fn.tagcloud.defaults = {
+                //size: {start: 1, end: 1, unit: 'em'},
+                color: {start: '#bbbbee', end: '#0085a1'},
+            };
+            $('#tag_cloud a').tagcloud();
+        })
+    }
+</script>
+
+<!--fastClick.js -->
+<script>
+    async("https://cdn.bootcss.com/fastclick/1.0.6/fastclick.min.js", function(){
+        var $nav = document.querySelector("nav");
+        if($nav) FastClick.attach($nav);
+    })
+</script>
+
+
+<!-- Google Analytics -->
+
+
+
+
+<!-- Baidu Tongji -->
+
+
+<!-- Side Catalog -->
+
+
+
+
+
+<!-- Image to hack wechat -->
+<img src="https://eachenkuang.github.io/img/icon_wechat.png" width="0" height="0" />
+<!-- Migrate from head to bottom, no longer block render and still work -->
+
+</body>
+
+</html>
