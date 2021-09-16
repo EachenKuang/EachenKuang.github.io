@@ -13,11 +13,11 @@
 
     <title>
         
-          重新出发，我回来了 - 易浅的世界 | Eachen&#39;s World
+          Redis 使用 Pipeline 提高查询速度 - 易浅的世界 | Eachen&#39;s World
         
     </title>
 
-    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/10/Start/">
+    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/16/UsingPipelineInRedis/">
 
     <!-- Bootstrap Core CSS -->
     
@@ -171,14 +171,14 @@
                 <div class="post-heading">
                     <div class="tags">
                         
-                          <a class="tag" href="/tags/#随笔" title="随笔">随笔</a>
+                          <a class="tag" href="/tags/#redis" title="redis">redis</a>
                         
                     </div>
-                    <h1>重新出发，我回来了</h1>
+                    <h1>Redis 使用 Pipeline 提高查询速度</h1>
                     <h2 class="subheading"></h2>
                     <span class="meta">
                         Posted by Eachen Kuang on
-                        2021-09-10
+                        2021-09-16
                     </span>
                 </div>
             </div>
@@ -197,14 +197,29 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <h1 id="易浅的世界——新的开始"><a href="#易浅的世界——新的开始" class="headerlink" title="易浅的世界——新的开始"></a>易浅的世界——新的开始</h1><blockquote>
-<p>9月10日是教师节，这一天，易浅的世界重新开放。</p>
+                <h1 id="Redis-使用-Pipeline-提高查询速度"><a href="#Redis-使用-Pipeline-提高查询速度" class="headerlink" title="Redis 使用 Pipeline 提高查询速度"></a>Redis 使用 Pipeline 提高查询速度</h1><p><a target="_blank" rel="noopener" href="https://redis.io/topics/pipelining">Using pipelining to speedup Redis queries – Redis</a></p>
+<h2 id="什么是-RTT-Round-Trip-Time往返时间-？"><a href="#什么是-RTT-Round-Trip-Time往返时间-？" class="headerlink" title="什么是 RTT (Round Trip Time往返时间)？"></a>什么是 RTT (Round Trip Time往返时间)？</h2><p>在维基百科中，是这样<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Round-trip_delay">介绍</a>的：</p>
+<p>在电讯方面， <strong>round-trip delay</strong> (<strong>RTD</strong>)  或 <strong>round-trip time</strong> (<strong>RTT</strong>) 是指发送信号所需的时间，加上确认接收信号所需的时间。此时间包括两个通信端点之间的路径的传播时间。在计算机网络中，信号通常是一个数据包。RTT 也称为 ping 时间，可以通过 ping 命令确定。</p>
+<p>可以这样理解，从客户端发送信号开始，到服务端接受信号后，客户端收到服务端返回的信号这一过程所花费的时间。</p>
+<h2 id="什么是Redis-中的-Pipelining"><a href="#什么是Redis-中的-Pipelining" class="headerlink" title="什么是Redis 中的 Pipelining?"></a>什么是Redis 中的 Pipelining?</h2><p>对于基于 Request/Response 的服务器可以被实现成处理新的请求，即使客户端还没收到旧的响应。这样就可以同时发送多个命令给服务器而不用等待响应，最后统一读回多个返回。</p>
+<p>这种方式被叫做 pipelining, 是一个广泛使用多年的技术，批量发送，批量返回。例如POP3协议也是这样，来加速从服务器上下载邮件。</p>
+<h2 id="为什么要使用Pipeline提高Redis查询速度？"><a href="#为什么要使用Pipeline提高Redis查询速度？" class="headerlink" title="为什么要使用Pipeline提高Redis查询速度？"></a>为什么要使用Pipeline提高Redis查询速度？</h2><p>Redis 在服务器与客户端之间传输信号是存在网络延时的，这个时间就是RTT。</p>
+<p>试想，如果算上RTT的网络延迟影响，如果客户端需要连续发送多个请求的情况下，RTT对性能的影响是很严重的。假如RTT的网络延时是250ms，尽管Redis 服务端每秒能处理10万个请求，但是我们也只能每秒最多处理四个请求。</p>
+<p>如果能够将这里请求一并传给服务端处理，那么久不需要每次都因为延时影响传输查询效率了。</p>
+<p>所以，对于大量的请求，我们可以使用Pipeline来一次性传输请求命令，最后统一读回数据。</p>
+<blockquote>
+<p><strong>特别注意</strong>: 当客户端使用管道 pipelining发送命令时，服务器端需要消耗内存来存放响应，所以如果你需要发送大量的命令，最好分批发送，例如一次发送1万个，读取回报，再循环发剩余的命令。速度上几乎无差异，但是内存最大消耗1万个命令回复结果的内存。</p>
 </blockquote>
-<p>最早写网站还是2017年的时候，那时用Django 写了一套个人网站，通过学生优化价格买了一个一年的服务器，然后还特意去注册了一个叫做<code>eachen.online</code>的域名，备案后直接上线了一段时间，后由于资源到期也不再继续维护了。可能还是因为懒吧！</p>
-<p>入职腾讯2年来，一直想着重新打开那个个人网站，但是由于各种因素导致一直没有去弄，终于，在今天找到一个契机，通过hexo与github pages 支持，弄了这样一个网站，主题也是使用了比较低调奢华有内涵的一个。</p>
-<p>先写到这里吧，后面还有很长的一段路，域名也买了5年，足够用了。</p>
-<p>后续，会在这里记录我的工作、生活、学习以及一些灵感。</p>
-<p><strong>I’m Back, eachen’s world!</strong></p>
+<h2 id="基准测试"><a href="#基准测试" class="headerlink" title="基准测试"></a>基准测试</h2><p>使用Python-Redis进行基准测试，可以看到结果差异还是比较大的。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># benchmark.py</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> redis_ins.client <span class="keyword">import</span> Client</span><br><span class="line"><span class="keyword">from</span> redis_ins.time_decorator <span class="keyword">import</span> run_time</span><br><span class="line"></span><br><span class="line">loop_round = <span class="number">1000</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@run_time</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">with_pipeline</span>(<span class="params">client: Client</span>):</span></span><br><span class="line">    pipeline = client.instance.pipeline()</span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(loop_round):</span><br><span class="line">        pipeline.ping()</span><br><span class="line">    pipeline.execute()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@run_time</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">without_pipeline</span>(<span class="params">client: Client</span>):</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(loop_round):</span><br><span class="line">        client.instance.ping()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    client = Client()</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;without pipeline&quot;</span>)</span><br><span class="line">    with_pipeline(client)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;with pipeline&quot;</span>)</span><br><span class="line">    without_pipeline(client)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>循环1000次的耗时对比</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">without pipeline</span><br><span class="line">函数with_pipeline运行开始:1631769580.494915</span><br><span class="line">函数with_pipeline运行结束:1631769580.573953</span><br><span class="line">函数with_pipeline执行了0.079秒</span><br><span class="line">with pipeline</span><br><span class="line">函数without_pipeline运行开始:1631769580.5739899</span><br><span class="line">函数without_pipeline运行结束:1631769591.982709</span><br><span class="line">函数without_pipeline执行了11.4087秒</span><br></pre></td></tr></table></figure>
+
+<p>循环10000次的耗时对比</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">without pipeline</span><br><span class="line">函数with_pipeline运行开始:1631769352.6500359</span><br><span class="line">函数with_pipeline运行结束:1631769352.873387</span><br><span class="line">函数with_pipeline执行了0.2234秒</span><br><span class="line">with pipeline</span><br><span class="line">函数without_pipeline运行开始:1631769352.873431</span><br><span class="line">函数without_pipeline运行结束:1631769461.964499</span><br><span class="line">函数without_pipeline执行了109.0911秒</span><br></pre></td></tr></table></figure>
+
+
 
 
                 <hr>
@@ -213,10 +228,10 @@
 
                 <ul class="pager">
                     
-                        <li class="previous">
-                            <a href="/2021/09/12/Laws-of-reflect-in-Golang/" data-toggle="tooltip" data-placement="top" title="初探Go反射三大定律">&larr; Previous Post</a>
-                        </li>
                     
+                        <li class="next">
+                            <a href="/2021/09/14/RESP/" data-toggle="tooltip" data-placement="top" title="Redis 协议详细规范">Next Post &rarr;</a>
+                        </li>
                     
                 </ul>
 
