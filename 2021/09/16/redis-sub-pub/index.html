@@ -13,11 +13,11 @@
 
     <title>
         
-          Redis 使用 Pipeline 提高查询速度 - 易浅的世界 | Eachen&#39;s World
+          Redis中的消息发布订阅 - 易浅的世界 | Eachen&#39;s World
         
     </title>
 
-    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/16/UsingPipelineInRedis/">
+    <link rel="canonical" href="https://eachenkuang.github.io/2021/09/16/redis-sub-pub/">
 
     <!-- Bootstrap Core CSS -->
     
@@ -174,7 +174,7 @@
                           <a class="tag" href="/tags/#redis" title="redis">redis</a>
                         
                     </div>
-                    <h1>Redis 使用 Pipeline 提高查询速度</h1>
+                    <h1>Redis中的消息发布订阅</h1>
                     <h2 class="subheading"></h2>
                     <span class="meta">
                         Posted by Eachen Kuang on
@@ -197,29 +197,86 @@
                 col-md-10 col-md-offset-1
                 post-container">
 
-                <h1 id="Redis-使用-Pipeline-提高查询速度"><a href="#Redis-使用-Pipeline-提高查询速度" class="headerlink" title="Redis 使用 Pipeline 提高查询速度"></a>Redis 使用 Pipeline 提高查询速度</h1><p><a target="_blank" rel="noopener" href="https://redis.io/topics/pipelining">Using pipelining to speedup Redis queries – Redis</a></p>
-<h2 id="什么是-RTT-Round-Trip-Time往返时间-？"><a href="#什么是-RTT-Round-Trip-Time往返时间-？" class="headerlink" title="什么是 RTT (Round Trip Time往返时间)？"></a>什么是 RTT (Round Trip Time往返时间)？</h2><p>在维基百科中，是这样<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Round-trip_delay">介绍</a>的：</p>
-<p>在电讯方面， <strong>round-trip delay</strong> (<strong>RTD</strong>)  或 <strong>round-trip time</strong> (<strong>RTT</strong>) 是指发送信号所需的时间，加上确认接收信号所需的时间。此时间包括两个通信端点之间的路径的传播时间。在计算机网络中，信号通常是一个数据包。RTT 也称为 ping 时间，可以通过 ping 命令确定。</p>
-<p>可以这样理解，从客户端发送信号开始，到服务端接受信号后，客户端收到服务端返回的信号这一过程所花费的时间。</p>
-<h2 id="什么是Redis-中的-Pipelining"><a href="#什么是Redis-中的-Pipelining" class="headerlink" title="什么是Redis 中的 Pipelining?"></a>什么是Redis 中的 Pipelining?</h2><p>对于基于 Request/Response 的服务器可以被实现成处理新的请求，即使客户端还没收到旧的响应。这样就可以同时发送多个命令给服务器而不用等待响应，最后统一读回多个返回。</p>
-<p>这种方式被叫做 pipelining, 是一个广泛使用多年的技术，批量发送，批量返回。例如POP3协议也是这样，来加速从服务器上下载邮件。</p>
-<h2 id="为什么要使用Pipeline提高Redis查询速度？"><a href="#为什么要使用Pipeline提高Redis查询速度？" class="headerlink" title="为什么要使用Pipeline提高Redis查询速度？"></a>为什么要使用Pipeline提高Redis查询速度？</h2><p>Redis 在服务器与客户端之间传输信号是存在网络延时的，这个时间就是RTT。</p>
-<p>试想，如果算上RTT的网络延迟影响，如果客户端需要连续发送多个请求的情况下，RTT对性能的影响是很严重的。假如RTT的网络延时是250ms，尽管Redis 服务端每秒能处理10万个请求，但是我们也只能每秒最多处理四个请求。</p>
-<p>如果能够将这里请求一并传给服务端处理，那么久不需要每次都因为延时影响传输查询效率了。</p>
-<p>所以，对于大量的请求，我们可以使用Pipeline来一次性传输请求命令，最后统一读回数据。</p>
+                <h1 id="Redis中的消息发布订阅"><a href="#Redis中的消息发布订阅" class="headerlink" title="Redis中的消息发布订阅"></a>Redis中的消息发布订阅</h1><h2 id="什么是发布订阅模式"><a href="#什么是发布订阅模式" class="headerlink" title="什么是发布订阅模式"></a>什么是发布订阅模式</h2><p>首先我们需要了解什么是<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern">发布订阅模式</a>（Publish–Subscribe Pattern）。</p>
+<p>Wiki百科如是说道：</p>
 <blockquote>
-<p><strong>特别注意</strong>: 当客户端使用管道 pipelining发送命令时，服务器端需要消耗内存来存放响应，所以如果你需要发送大量的命令，最好分批发送，例如一次发送1万个，读取回报，再循环发剩余的命令。速度上几乎无差异，但是内存最大消耗1万个命令回复结果的内存。</p>
+<p>在软件架构中，发布-订阅是一种消息传递模式，其中消息的发送者（称为发布者）不会将消息编程为直接发送给特定的接收者（称为订阅者），而是将已发布的消息分类到不知道哪些订阅者的情况下。 类似地，订阅者表示对一个或多个频道感兴趣并且只接收感兴趣的消息，而不知道有哪些发布者。 </p>
+<p>发布-订阅是消息队列范式的兄弟，通常是更大的面向消息的中间件系统的一部分。 大多数消息传递系统在其 API 中同时支持发布/订阅和消息队列模型； 例如，Java 消息服务 (JMS)。 </p>
+<p>这种模式提供了更大的网络可扩展性和更动态的网络拓扑，从而降低了修改发布者和发布数据结构的灵活性。 </p>
 </blockquote>
-<h2 id="基准测试"><a href="#基准测试" class="headerlink" title="基准测试"></a>基准测试</h2><p>使用Python-Redis进行基准测试，可以看到结果差异还是比较大的。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># benchmark.py</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> redis_ins.client <span class="keyword">import</span> Client</span><br><span class="line"><span class="keyword">from</span> redis_ins.time_decorator <span class="keyword">import</span> run_time</span><br><span class="line"></span><br><span class="line">loop_round = <span class="number">1000</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@run_time</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">with_pipeline</span>(<span class="params">client: Client</span>):</span></span><br><span class="line">    pipeline = client.instance.pipeline()</span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(loop_round):</span><br><span class="line">        pipeline.ping()</span><br><span class="line">    pipeline.execute()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@run_time</span></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">without_pipeline</span>(<span class="params">client: Client</span>):</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(loop_round):</span><br><span class="line">        client.instance.ping()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    client = Client()</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;without pipeline&quot;</span>)</span><br><span class="line">    with_pipeline(client)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;with pipeline&quot;</span>)</span><br><span class="line">    without_pipeline(client)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="Redis中的发布订阅"><a href="#Redis中的发布订阅" class="headerlink" title="Redis中的发布订阅"></a>Redis中的发布订阅</h2><p>在Redis中，以下命令</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/psubscribe">PSUBSCRIBE</a></li>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/publish">PUBLISH</a></li>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/pubsub">PUBSUB</a></li>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/punsubscribe">PUNSUBSCRIBE</a></li>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/subscribe">SUBSCRIBE</a></li>
+<li><a target="_blank" rel="noopener" href="https://redis.io/commands/unsubscribe">UNSUBSCRIBE</a></li>
+</ul>
+<p>实现了发布订阅模式</p>
+<p>例如，对于<code>SUBSCRIBE</code>命令，可以通过运行如下命令来订阅频道，后面可以接一个或者多个频道名</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SUBSCRIBE channel1 channel2</span><br></pre></td></tr></table></figure>
 
-<p>循环1000次的耗时对比</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">without pipeline</span><br><span class="line">函数with_pipeline运行开始:1631769580.494915</span><br><span class="line">函数with_pipeline运行结束:1631769580.573953</span><br><span class="line">函数with_pipeline执行了0.079秒</span><br><span class="line">with pipeline</span><br><span class="line">函数without_pipeline运行开始:1631769580.5739899</span><br><span class="line">函数without_pipeline运行结束:1631769591.982709</span><br><span class="line">函数without_pipeline执行了11.4087秒</span><br></pre></td></tr></table></figure>
+<p>取消订阅命令，与订阅命令一致，也可以接一个或者多个频道名</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">UNSUBSCRIBE channel1 channel2</span><br></pre></td></tr></table></figure>
 
-<p>循环10000次的耗时对比</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">without pipeline</span><br><span class="line">函数with_pipeline运行开始:1631769352.6500359</span><br><span class="line">函数with_pipeline运行结束:1631769352.873387</span><br><span class="line">函数with_pipeline执行了0.2234秒</span><br><span class="line">with pipeline</span><br><span class="line">函数without_pipeline运行开始:1631769352.873431</span><br><span class="line">函数without_pipeline运行结束:1631769461.964499</span><br><span class="line">函数without_pipeline执行了109.0911秒</span><br></pre></td></tr></table></figure>
+<p>当有客户端发送消息到这些频道时，Redis将会推送传入的消息给所有订阅这些频道的客户端。</p>
+<p>正在订阅频道的客户端不应该发送除了订阅或取消订阅以外的命令。订阅和退订操作的执行结果以消息的形式返回，客户端可以读取收到消息的第一个元素来区分收到的是消息类型，还是订阅和退订操作执行结果。</p>
+<p>进入订阅模式后，订阅客户端只能执行以下命令：</p>
+<p> <a target="_blank" rel="noopener" href="https://redis.io/commands/subscribe">SUBSCRIBE</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/psubscribe">PSUBSCRIBE</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/unsubscribe">UNSUBSCRIBE</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/punsubscribe">PUNSUBSCRIBE</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/ping">PING</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/reset">RESET</a>, <a target="_blank" rel="noopener" href="https://redis.io/commands/quit">QUIT</a></p>
+<blockquote>
+<p>注意：在&gt;=6.2 版本才能使用 RESET 命令</p>
+</blockquote>
+<p>下图为实例的实际效果</p>
+<p><img src="/2021/09/16/redis-sub-pub/image-20210916193019290.png" alt="image-20210916193019290"></p>
+<h3 id="推送消息的格式说明"><a href="#推送消息的格式说明" class="headerlink" title="推送消息的格式说明"></a>推送消息的格式说明</h3><p>消息是一个带有三个元素的Array Reply</p>
+<p>第一个元素只能是下面三种之一：</p>
+<ul>
+<li><code>subscribe</code>: 表示成功订阅到以第二个返回元素命名的频道。第三个元素表示客户端当前订阅频道总数。</li>
+<li><code>unsubscribe</code>: 表示成功退订以第二个返回元素命名的频道。第三个元素表示客户端当前订阅频道总数。当第三个参数为零的时候，表示客户端已退出Pub/Sub状态，不再订阅任何频道，可以发送订阅和退订以外的Redis 命令。</li>
+<li><code>message</code>: 表示收到其它某一个客户端用 <a target="_blank" rel="noopener" href="https://redis.com.cn/commands/publish">PUBLISH</a> 发布的消息，第二个元素是来源频道的名字，第三个参数是消息实际内容。</li>
+</ul>
+<h3 id="实际效果"><a href="#实际效果" class="headerlink" title="实际效果"></a>实际效果</h3><p>客户端1——发布者</p>
+<p><img src="/2021/09/16/redis-sub-pub/image-20210916194300996.png" alt="image-20210916194300996"></p>
+<p>客户端2——订阅者</p>
+<p><img src="/2021/09/16/redis-sub-pub/image-20210916194135217.png" alt="image-20210916194135217"></p>
+<p>可以看到，发布者在channel1 与 channel 2频道各发送了两条信息，订阅者因为订阅两个频道，接收到四条信息。四个Array Reply。</p>
+<h3 id="带有模式匹配的订阅"><a href="#带有模式匹配的订阅" class="headerlink" title="带有模式匹配的订阅"></a>带有模式匹配的订阅</h3><p>可以看到，只是在<code>SUBSCRIBE</code>以及<code>UNSUBSCRIBE</code>前面增加了一个<code>P</code>，这里的<code>P</code>就是Pattern的意思，使用方法同<code>SUBSCRIBE</code>以及<code>UNSUBSCRIBE</code>，只是传参为Pattern模式</p>
+<ul>
+<li><p><a target="_blank" rel="noopener" href="https://redis.io/commands/psubscribe">PSUBSCRIBE</a></p>
+<ul>
+<li><p><code>PSUBSCRIBE pattern [pattern ...]</code></p>
+</li>
+<li><p>订阅符合模式的对应的频道，支持glob</p>
+<ul>
+<li><code>h?llo</code> subscribes to <code>hello</code>, <code>hallo</code> and <code>hxllo</code></li>
+<li><code>h*llo</code> subscribes to <code>hllo</code> and <code>heeeello</code></li>
+<li><code>h[ae]llo</code> subscribes to <code>hello</code> and <code>hallo,</code> but not <code>hillo</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://redis.io/commands/punsubscribe">PUNSUBSCRIBE</a></p>
+<ul>
+<li><p><code>PUNSUBSCRIBE [pattern [pattern ...]]</code></p>
+</li>
+<li><p>取消订阅符合模式的对应的频道，如果为空，则取消所有</p>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="实现Redis中的发布订阅模式"><a href="#实现Redis中的发布订阅模式" class="headerlink" title="实现Redis中的发布订阅模式"></a>实现Redis中的发布订阅模式</h2><p>订阅者</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> redis_ins.client <span class="keyword">import</span> Client</span><br><span class="line"></span><br><span class="line">channel = <span class="string">&quot;eachen_radio&quot;</span></span><br><span class="line">client = Client()</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    spub = client.instance.pubsub()</span><br><span class="line">    spub.subscribe(channel)</span><br><span class="line">    <span class="keyword">for</span> items <span class="keyword">in</span> spub.listen():</span><br><span class="line">        <span class="built_in">print</span>(items)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
+<p>发布者</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> redis_ins.client <span class="keyword">import</span> Client</span><br><span class="line"></span><br><span class="line">channel = <span class="string">&quot;eachen_radio&quot;</span></span><br><span class="line">client = Client()</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    my_input = <span class="built_in">input</span>(<span class="string">&#x27;请输入发布内容：&#x27;</span>)</span><br><span class="line">    client.instance.publish(channel, my_input)</span><br></pre></td></tr></table></figure>
 
+<p>同时运行两个客户端代码</p>
+<p>在【发布者】的命令行中输入消息</p>
+<p><img src="/2021/09/16/redis-sub-pub/image-20210916192602627.png" alt="image-20210916192602627"></p>
+<p>在【订阅者】的命令行中可以看到收到了消息</p>
+<p><img src="/2021/09/16/redis-sub-pub/image-20210916192645703.png" alt="image-20210916192645703"></p>
+<p>发布者在频道<code>eachen_radio</code>上发布消息，订阅者在同一个频道上接受消息</p>
 
 
                 <hr>
@@ -228,13 +285,9 @@
 
                 <ul class="pager">
                     
-                        <li class="previous">
-                            <a href="/2021/09/16/redis-sub-pub/" data-toggle="tooltip" data-placement="top" title="Redis中的消息发布订阅">&larr; Previous Post</a>
-                        </li>
-                    
                     
                         <li class="next">
-                            <a href="/2021/09/14/RESP/" data-toggle="tooltip" data-placement="top" title="Redis 协议详细规范">Next Post &rarr;</a>
+                            <a href="/2021/09/16/UsingPipelineInRedis/" data-toggle="tooltip" data-placement="top" title="Redis 使用 Pipeline 提高查询速度">Next Post &rarr;</a>
                         </li>
                     
                 </ul>
